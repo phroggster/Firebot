@@ -1,13 +1,14 @@
 "use strict";
 (function() {
     const moment = require('moment');
-
     const uuid = require("uuid/v4");
+    const marked = require("marked");
+    const { sanitize } = require("dompurify");
 
     angular
         .module('firebotApp')
         .factory('chatMessagesService', function (logger, listenerService, settingsService,
-            soundService, backendCommunicator, pronounsService, accountAccess, ngToast) {
+            soundService, backendCommunicator, pronounsService, accountAccess, ngToast, $sce) {
             const service = {};
 
             // Chat Message Queue
@@ -131,6 +132,7 @@
 
             // Chat Alert Message
             service.chatAlertMessage = function(message) {
+                message = $sce.trustAsHtml(marked(message));
 
                 const alertItem = {
                     id: uuid(),
