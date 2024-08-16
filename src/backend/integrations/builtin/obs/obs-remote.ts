@@ -954,6 +954,16 @@ export async function getGroupItem(groupName: string, groupItemId: number): Prom
     }
 }
 
+export async function getGroupItemByName(groupName: string, itemName: string): Promise<OBSSceneItem> {
+    try {
+        const groupItems = await getAllSceneItemsInGroup(groupName);
+        return groupItems.find(item => item.name.toLowerCase() === itemName.toLowerCase());
+    } catch {
+        logger.error(`Failed to get OBS scene item ${itemName} in group ${groupName}`);
+        return null;
+    }
+}
+
 export async function getSourcesWithFilters(): Promise<Array<OBSSource>> {
     const sources = await getAllSources();
     return sources?.filter(s => s.filters?.length > 0);
