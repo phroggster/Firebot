@@ -1159,6 +1159,17 @@ export async function toggleSourceMuted(sourceName: string) {
     }
 }
 
+export async function getSourceMuted(inputName: string): Promise<boolean> {
+    try {
+        return (await obs.call("GetInputMute", {
+            inputName
+        })).inputMuted ?? false;
+    } catch {
+        logger.error(`Failed to get mute status for input ${inputName}`);
+    }
+    return false;
+}
+
 export async function setSourceMuted(sourceName: string, muted: boolean) {
     try {
         await obs.call("SetInputMute", {
