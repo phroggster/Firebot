@@ -707,6 +707,18 @@ export async function setCurrentSceneCollection(
 
 export type SourceData = Record<string, Array<{ id: number; name: string, groupName?: string }>>;
 
+export async function getSourceActive(sourceName: string): Promise<boolean | null> {
+    if (!connected) {
+        return null;
+    }
+    try {
+        return (await obs.call("GetSourceActive", { sourceName }))?.videoActive;
+    } catch {
+        logger.error(`Failed to get source active state for source named ${sourceName}`);
+        return null;
+    }
+}
+
 export async function getSourceData(): Promise<SourceData> {
     if (!connected) {
         return null;
