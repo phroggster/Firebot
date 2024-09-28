@@ -120,7 +120,7 @@ async function createIconImage(relativeIconPath) {
  * Firebot's main window
  * Keeps a global reference of the window object, if you don't, the window will
  * be closed automatically when the JavaScript object is garbage collected.
- *@type {Electron.BrowserWindow}
+ * @type {Electron.BrowserWindow}
  */
 exports.mainWindow = null;
 
@@ -199,12 +199,15 @@ async function createMainWindow() {
 
     const profileManager = require("../../common/profile-manager");
     const dataAccess = require("../../common/data-access");
+    const isMacOS = process.platform === 'darwin';
     const menuTemplate = [
+        ...(isMacOS ? [{ role: 'appMenu' }] : []),
         {
-            label: 'File',
+            label: isMacOS ? 'File' : '&File',
+            // role: 'fileMenu',
             submenu: [
                 {
-                    label: 'Import Firebot Setup...',
+                    label: isMacOS ? 'Import Firebot Setup…' : 'Import Firebot &Setup…',
                     click: () => {
                         frontendCommunicator.send("open-modal", {
                             component: "importSetupModal"
@@ -216,7 +219,7 @@ async function createMainWindow() {
                     type: 'separator'
                 },
                 {
-                    label: 'Open Data Folder',
+                    label: isMacOS ? 'Open Data Folder' : 'Open &Data Folder',
                     toolTip: "Open the folder where Firebot data is stored",
                     sublabel: "Open the folder where Firebot data is stored",
                     click: () => {
@@ -228,7 +231,7 @@ async function createMainWindow() {
                     icon: await createIconImage("../../../gui/images/icons/mdi/folder-account-outline.png")
                 },
                 {
-                    label: 'Open Logs Folder',
+                    label: isMacOS ? 'Open Logs Folder' : 'Open &Logs Folder',
                     toolTip: "Open the folder where logs are stored",
                     sublabel: "Open the folder where logs are stored",
                     click: () => {
@@ -240,7 +243,7 @@ async function createMainWindow() {
                     icon: await createIconImage("../../../gui/images/icons/mdi/folder-text-outline.png")
                 },
                 {
-                    label: 'Open Backups Folder',
+                    label: isMacOS ? 'Open Backups Folder' : 'Open &Backups Folder',
                     toolTip: "Open the folder where backups are stored",
                     sublabel: "Open the folder where backups are stored",
                     click: () => {
@@ -255,58 +258,115 @@ async function createMainWindow() {
                     type: 'separator'
                 },
                 {
+                    label: isMacOS ? undefined : '&Quit',
                     role: 'quit',
                     icon: await createIconImage("../../../gui/images/icons/mdi/exit-run.png")
                 }
             ]
         },
         {
-            label: 'Edit',
+            label: isMacOS ? 'Edit' : '&Edit',
+            // role: 'editMenu',
             submenu: [
                 {
+                    label: isMacOS ? undefined : '&Undo',
+                    role: 'undo',
+                    icon: await createIconImage("../../../gui/images/icons/mdi/undo.png")
+                },
+                {
+                    label: isMacOS ? undefined : '&Redo',
+                    role: 'redo',
+                    icon: await createIconImage("../../../gui/images/icons/mdi/redo.png")
+                },
+                {
+                    type: 'separator'
+                },
+                {
+                    label: isMacOS ? undefined : 'Cu&t',
                     role: 'cut',
                     icon: await createIconImage("../../../gui/images/icons/mdi/content-cut.png")
                 },
                 {
+                    label: isMacOS ? undefined : '&Copy',
                     role: 'copy',
                     icon: await createIconImage("../../../gui/images/icons/mdi/content-copy.png")
                 },
                 {
+                    label: isMacOS ? undefined : '&Paste',
                     role: 'paste',
                     icon: await createIconImage("../../../gui/images/icons/mdi/content-paste.png")
                 },
                 {
-                    role: "undo",
-                    icon: await createIconImage("../../../gui/images/icons/mdi/undo.png")
+                    type: 'separator'
                 },
                 {
-                    role: "redo",
-                    icon: await createIconImage("../../../gui/images/icons/mdi/redo.png")
-                },
-                {
-                    role: "selectAll",
+                    label: isMacOS ? undefined : 'Select &All',
+                    role: 'selectAll',
                     icon: await createIconImage("../../../gui/images/icons/mdi/select-all.png")
                 }
             ]
         },
         {
-            label: 'Window',
+            label: isMacOS ? 'Window' : '&Window',
+            // role: 'windowMenu',
             submenu: [
                 {
+                    label: isMacOS ? undefined : "Mi&nimize",
                     role: 'minimize',
                     icon: await createIconImage("../../../gui/images/icons/mdi/window-minimize.png")
                 },
                 {
+                    label: isMacOS ? 'Maximize' : '&Maximize',
+                    icon: await createIconImage("../../../gui/images/icons/mdi/window-maximize.png")
+                },
+                {
+                    label: isMacOS ? undefined : '&Full-Screen',
+                    role: 'toggleFullscreen'
+                    // todo: icon
+                },
+                {
+                    label: isMacOS ? 'Restore' : '&Restore',
+                    icon: await createIconImage("../../../gui/images/icons/mdi/window-restore.png")
+                },
+                {
+                    type: 'separator'
+                },
+                ...(isMacOS ? [{
+                    role: 'zoom',
+                    icon: await createIconImage("../../../gui/images/icons/mdi/magnify.png")
+                }] : [{
+                    label: '&Zoom',
+                    // todo: icon
+                    submenu: [
+                        {
+                            label: 'Zoom &In',
+                            role: 'zoomIn'
+                            // todo: icon
+                        },
+                        {
+                            label: 'Zoom &Out',
+                            role: 'zoomOut'
+                            // todo: icon
+                        },
+                        {
+                            label: '&Reset Zoom',
+                            role: 'resetZoom'
+                            // todo: icon
+                        }
+                    ]
+                }]),
+                {
+                    label: isMacOS ? undefined : '&Close',
                     role: 'close',
                     icon: await createIconImage("../../../gui/images/icons/mdi/window-close.png")
                 }
             ]
         },
         {
-            label: 'Tools',
+            label: isMacOS ? 'Tools' : '&Tools',
             submenu: [
                 {
-                    label: 'Setup Wizard',
+                    label: isMacOS ? 'Setup Wizard' : 'Setup &Wizard',
                     toolTip: "Run the setup wizard again",
                     sublabel: "Run the setup wizard again",
                     click: () => {
@@ -317,7 +377,7 @@ async function createMainWindow() {
                     icon: await createIconImage("../../../gui/images/icons/mdi/auto-fix.png")
                 },
                 {
-                    label: 'Restore from backup...',
+                    label: isMacOS ? 'Restore from Backup…' : 'Restore from &Backup…',
                     toolTip: "Restores Firebot from a backup",
                     sublabel: "Restores Firebot from a backup",
                     click: async () => {
@@ -326,7 +386,7 @@ async function createMainWindow() {
                     icon: await createIconImage("../../../gui/images/icons/mdi/backup-restore.png")
                 },
                 {
-                    label: 'Custom Variable Inspector',
+                    label: isMacOS ? 'Custom Variable Inspector' : 'Custom &Variable Inspector',
                     toolTip: "Open the custom variable inspector",
                     sublabel: "Open the custom variable inspector",
                     click: () => {
@@ -339,23 +399,25 @@ async function createMainWindow() {
                     type: 'separator'
                 },
                 {
-                    role: 'toggledevtools',
+                    label: isMacOS ? undefined : 'Toggle &Developer Tools',
+                    role: 'toggleDevTools',
                     icon: await createIconImage("../../../gui/images/icons/mdi/tools.png")
                 }
             ]
         },
         {
-            role: 'Help',
+            label: isMacOS ? 'Help' : '&Help',
+            // role: isMacOS ? 'Help' : undefined,
             submenu: [
                 {
-                    label: 'Join our Discord',
+                    label: isMacOS ? 'Join our Discord' : '&Join our Discord',
                     click: () => {
                         shell.openExternal("https://discord.gg/tTmMbrG");
                     },
                     icon: await createIconImage("../../../gui/images/icons/discord.png")
                 },
                 {
-                    label: 'Follow @FirebotApp on Twitter',
+                    label: isMacOS ? 'Follow @FirebotApp on Twitter' : '&Follow @FirebotApp on Twitter',
                     click: () => {
                         shell.openExternal("https://twitter.com/FirebotApp");
                     },
@@ -365,21 +427,42 @@ async function createMainWindow() {
                     type: 'separator'
                 },
                 {
-                    label: 'View Source on GitHub',
+                    label: isMacOS ? 'Read our Docs' : '&Read our Docs',
+                    toolTip: "Visit our new documentation web site, but much of it is still being created.",
+                    sublabel: "Visit our new documentation web site, but much of it is still being created.",
+                    click: () => {
+                        shell.openExternal("https://docs.firebot.app/");
+                    },
+                    icon: await createIconImage("../../../gui/images/icons/mdi/book-open-blank-variant-outline.png")
+                },
+                {
+                    label: isMacOS ? 'Read our Wiki' : 'Read our &Wiki',
+                    toolTip: "Our GitHub wiki has a lot of information about how to use Firebot, but much of it is aging like a fine wine.",
+                    sublabel: "Our GitHub wiki has a lot of information about how to use Firebot, but much of it is aging like a fine wine.",
+                    click: () => {
+                        shell.openExternal("https://github.com/crowbartools/Firebot/wiki");
+                    },
+                    icon: await createIconImage("../../../gui/images/icons/mdi/book-open-variant-outline.png")
+                },
+                {
+                    type: 'separator'
+                },
+                {
+                    label: isMacOS ? 'View Source on GitHub' : 'View Source on &GitHub',
                     click: () => {
                         shell.openExternal("https://github.com/crowbartools/Firebot");
                     },
-                    icon: await createIconImage("../../../gui/images/icons/mdi/source-branch.png")
+                    icon: await createIconImage("../../../gui/images/icons/mdi/github.png")
                 },
                 {
-                    label: 'Report a Bug',
+                    label: isMacOS ? 'Report a Bug' : 'Report a &Bug',
                     click: () => {
                         shell.openExternal("https://github.com/crowbartools/Firebot/issues/new?assignees=&labels=Bug&template=bug_report.yml&title=%5BBug%5D+");
                     },
                     icon: await createIconImage("../../../gui/images/icons/mdi/bug-outline.png")
                 },
                 {
-                    label: 'Request a Feature',
+                    label: isMacOS ? 'Request a Feature' : 'Re&quest a Feature',
                     click: () => {
                         shell.openExternal("https://github.com/crowbartools/Firebot/issues/new?assignees=&labels=Enhancement&template=feature_request.md&title=%5BFeature+Request%5D+");
                     },
@@ -389,21 +472,21 @@ async function createMainWindow() {
                     type: 'separator'
                 },
                 {
-                    label: 'Merch Store',
+                    label: isMacOS ? 'Merch Store' : '&Merch Store',
                     click: () => {
                         shell.openExternal("https://crowbar-tools.myspreadshop.com");
                     },
                     icon: await createIconImage("../../../gui/images/icons/mdi/shopping-outline.png")
                 },
                 {
-                    label: 'Donate',
+                    label: isMacOS ? 'Donate' : '&Donate',
                     click: () => {
                         shell.openExternal("https://opencollective.com/crowbartools");
                     },
                     icon: await createIconImage("../../../gui/images/icons/mdi/hand-heart-outline.png")
                 },
                 {
-                    label: 'Submit a Testimonial',
+                    label: isMacOS ? 'Submit a Testimonial' : 'Submit a &Testimonial',
                     click: () => {
                         shell.openExternal("https://firebot.app/testimonial-submission");
                     },
@@ -413,7 +496,8 @@ async function createMainWindow() {
                     type: 'separator'
                 },
                 {
-                    label: 'About Firebot...',
+                    label: isMacOS ? 'About Firebot…' : '&About Firebot…',
+                    // role: 'about',
                     click: () => {
                         frontendCommunicator.send("open-about-modal");
                     },
