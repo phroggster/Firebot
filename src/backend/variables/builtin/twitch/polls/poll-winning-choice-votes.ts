@@ -1,6 +1,6 @@
-import { ReplaceVariable } from "../../../../types/variables";
-import { EffectTrigger } from "../../../../shared/effect-constants";
-import { OutputDataType, VariableCategory } from "../../../../shared/variable-constants";
+import { ReplaceVariable } from "../../../../../types/variables";
+import { EffectTrigger } from "../../../../../shared/effect-constants";
+import { OutputDataType, VariableCategory } from "../../../../../shared/variable-constants";
 
 const triggers = {};
 triggers[EffectTrigger.EVENT] = [
@@ -18,7 +18,7 @@ const model : ReplaceVariable = {
         possibleDataOutput: [OutputDataType.NUMBER]
     },
     evaluator: (trigger) => {
-        return trigger.metadata.eventData.winningChoiceVotes;
+        return trigger.metadata?.eventData?.winningChoiceVotes ?? -1;
     }
 };
 

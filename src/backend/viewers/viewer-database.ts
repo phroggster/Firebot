@@ -17,6 +17,7 @@ import util, { wait } from "../utility";
 import { Rank, RankLadder } from "../../types/ranks";
 import twitchChat from "../chat/twitch-chat";
 import { userIsActive } from "../chat/chat-listeners/active-user-handler";
+import roleHelpers from "../roles/role-helpers";
 
 interface ViewerDbChangePacket {
     userId: string;
@@ -460,7 +461,7 @@ class ViewerDatabase extends EventEmitter {
         });
     }
 
-    async setViewerRank(viewer: FirebotViewer, ladderId: string, newRankId: string): Promise<void> {
+    async setViewerRank(viewer: FirebotViewer, ladderId: string, newRankId?: string): Promise<void> {
         if (this.isViewerDBOn() !== true) {
             return;
         }
@@ -479,17 +480,27 @@ class ViewerDatabase extends EventEmitter {
             return;
         }
 
-        const isPromotion = ladder.isRankHigher(newRankId, currentRankId);
-
         viewer.ranks[ladderId] = newRankId;
 
         await this.updateViewer(viewer);
 
+        const isPromotion = ladder.isRankHigher(newRankId, currentRankId);
+
         if (isPromotion && ladder.announcePromotionsInChat && userIsActive(viewer._id)) {
             const newRank = ladder.getRank(newRankId);
             const rankValueDescription = ladder.getRankValueDescription(newRankId);
-            twitchChat.sendChatMessage(`@${viewer.displayName} has achieved the rank of ${newRank?.name}${ladder.mode === "auto" ? ` (${rankValueDescription})` : ''}!`);
+
+            const promotionMessageTemplate = ladder.promotionMessageTemplate;
+            const promotionMessage = promotionMessageTemplate
+                .replace(/{user}/g, viewer.displayName)
+                .replace(/{rank}/g, newRank?.name)
+                .replace(/{rankDescription}/g, rankValueDescription);
+
+            twitchChat.sendChatMessage(promotionMessage);
         }
+
+        const newRank = ladder.getRank(newRankId);
+        const previousRank = ladder.getRank(currentRankId);
 
         eventManager.triggerEvent("firebot", "viewer-rank-updated", {
             username: viewer.username,
@@ -497,8 +508,10 @@ class ViewerDatabase extends EventEmitter {
             userDisplayName: viewer.displayName,
             rankLadderName: ladder.name,
             rankLadderId: ladderId,
-            newRankName: ladder.getRank(newRankId)?.name,
-            previousRankName: ladder.getRank(currentRankId)?.name,
+            newRankName: newRank?.name,
+            newRankId: newRank?.id,
+            previousRankName: previousRank?.name,
+            previousRankId: previousRank?.id,
             isPromotion: isPromotion,
             isDemotion: !isPromotion
         });
@@ -610,13 +623,38 @@ class ViewerDatabase extends EventEmitter {
         }
 
         for (const ladder of applicableLadders) {
+
             const currentRankId = viewer.ranks[ladder.id];
+
+            if (ladder.restrictedToRoleIds.length > 0) {
+                const userRoles = await roleHelpers.getAllRolesForViewer(userId);
+                if (!userRoles.some(r => ladder.restrictedToRoleIds.includes(r.id))) {
+                    if (currentRankId != null) {
+                        await this.setViewerRank(viewer, ladder.id, undefined);
+                    }
+                    continue;
+                }
+            }
+
             const highestQualifiedRankId = ladder.getHighestQualifiedRankId(viewer);
 
             if (currentRankId !== highestQualifiedRankId) {
                 await this.setViewerRank(viewer, ladder.id, highestQualifiedRankId);
             }
         }
+    }
+    async calculateAutoRanksByName(userName: string, trackByType?: RankLadder["settings"]["trackBy"]): Promise<void> {
+        if (this.isViewerDBOn() !== true) {
+            return;
+        }
+
+        const viewer = await this.getViewerByUsername(userName);
+
+        if (viewer == null) {
+            return;
+        }
+
+        await this.calculateAutoRanks(viewer._id, trackByType);
     }
 
     async recalculateRanksForAllViewers(rankLadderId: string): Promise<void> {

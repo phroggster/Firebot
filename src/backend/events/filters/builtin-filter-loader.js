@@ -13,18 +13,25 @@ exports.loadFilters = () => {
         'custom-variable-name',
         'donation-amount',
         'donation-from',
+        'effect-queue',
         'gift-count',
         'gift-duration',
         'is-anonymous',
         'message',
+        'metadata-key',
+        'metadata-value',
         'new-currency-amount',
+        'new-rank',
         'new-view-time',
         'previous-currency-amount',
+        'previous-rank',
         'previous-view-time',
         'raid-viewer-count',
         'rank-ladder',
+        'rank-transition-type',
         'reward-name',
         'reward',
+        'shared-chat',
         'stream-category',
         'sub-kind',
         'sub-type',
@@ -32,7 +39,7 @@ exports.loadFilters = () => {
         'viewer-ranks',
         'viewer-roles'
     ].forEach((filename) => {
-        const definition = require(`./builtin/${filename}.js`);
+        const definition = require(`./builtin/${filename}`);
         filterManager.registerFilter(definition);
     });
 };

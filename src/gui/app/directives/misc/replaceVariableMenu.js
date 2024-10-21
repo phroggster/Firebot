@@ -88,11 +88,11 @@
                                 type: trigger,
                                 id: triggerMeta && triggerMeta.triggerId,
                                 dataOutput: $scope.replaceVariables
-                            }).map(v => {
+                            }).map((v) => {
                                 return {
                                     ...v,
                                     description: parseMarkdown(v.description || ""),
-                                    examples: v.examples?.map(e => {
+                                    examples: v.examples?.map((e) => {
                                         return {
                                             ...e,
                                             description: parseMarkdown(e.description || "")

@@ -6,6 +6,7 @@ const frontendCommunicator = require("../../common/frontend-communicator");
 const EventEmitter = require("events");
 const { abortEffectList } = require("../../common/effect-abort-helpers");
 
+
 /**
  * Queue Entry
  * @typedef {Object} QueueEntry
@@ -141,6 +142,10 @@ class EffectQueue {
 
         logger.debug(`Added more effects to queue ${this.id}. Current length=${this._queue.length}`);
 
+        eventManager.triggerEvent("firebot", "effect-queue-added", {
+            effectQueueId: this.id
+        });
+
         this.sendQueueLengthUpdate();
 
         this.processEffectQueue();
@@ -168,11 +173,21 @@ class EffectQueue {
 
     pauseQueue() {
         logger.debug(`Pausing queue ${this.id}...`);
+
+        eventManager.triggerEvent("firebot", "effect-queue-status", {
+            effectQueueId: this.id
+        });
+
         this._paused = true;
     }
 
     resumeQueue() {
         logger.debug(`Resuming queue ${this.id}...`);
+
+        eventManager.triggerEvent("firebot", "effect-queue-status", {
+            effectQueueId: this.id
+        });
+
         this._paused = false;
         this.processEffectQueue();
     }
@@ -260,7 +275,6 @@ function abortActiveEffectListsForQueue(queueId, bubbleStop = true) {
 function abortActiveEffectListsForAllQueues(bubbleStop = true) {
     Object.keys(queues).forEach(queueId => abortActiveEffectListsForQueue(queueId, bubbleStop));
 }
-
 /**
  * @type {import("tiny-typed-emitter").TypedEmitter<{
 *    "length-updated": (item: object) => void;
