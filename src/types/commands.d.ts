@@ -30,6 +30,9 @@ export type SubCommand = {
     inheritBaseCommandCooldown?: boolean;
     effects?: EffectList;
 };
+type SystemSubCommand = SubCommand & {
+    hideCooldowns?: boolean;
+};
 
 type CommandOptionBase = {
     type: "string" | "number" | "boolean" | "enum";
@@ -153,6 +156,7 @@ CommandDefinition,
 
 export type SystemCommandDefinition = CommandDefinition & {
     hideCooldowns?: boolean;
+    subCommands?: SystemSubCommand[];
 };
 
 export type SystemCommand<OptionsModel = unknown> = {

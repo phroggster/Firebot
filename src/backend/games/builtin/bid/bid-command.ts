@@ -1,35 +1,63 @@
-"use strict";
+import gameManager from "../../game-manager";
+import commandManager from "../../../chat/commands/command-manager";
+import twitchChat from "../../../chat/twitch-chat";
+import currencyAccess from "../../../currency/currency-access";
+import currencyManager from "../../../currency/currency-manager";
+import util from "../../../utility";
+import { SystemCommand } from "../../../../types/commands";
 
-const util = require("../../../utility");
-const twitchChat = require("../../../chat/twitch-chat");
-const commandManager = require("../../../chat/commands/command-manager");
-const gameManager = require("../../game-manager");
-const currencyAccess = require("../../../currency/currency-access").default;
-const currencyManager = require("../../../currency/currency-manager");
-const moment = require("moment");
-const NodeCache = require("node-cache");
+import moment from "moment";
+import NodeCache from "node-cache";
 
-let activeBiddingInfo = {
-    "active": false,
-    "currentBid": 0,
-    "topBidder": "",
-    "topBidderDisplayName": ""
+type Chatter = "bot"|"streamer";
+type BidInfo = {
+    active: boolean;
+    currentBid: number;
+    topBidder: string;
+    topBidderDisplayName?: string;
+}
+type BidSettings = {
+    chatSettings: {
+        chatter: Chatter;
+    };
+    cooldownSettings: {
+        cooldown?: number|null;
+    };
+    currencySettings: {
+        currencyId: string;
+        minBid?: number|null;
+        minIncrement?: number|null;
+    };
+    timeSettings: {
+        timeLimit?: number|null;
+    }
+}
+
+let activeBiddingInfo: BidInfo = {
+    active: false,
+    currentBid: 0,
+    topBidder: "",
+    topBidderDisplayName: undefined
 };
-let bidTimer;
+let bidTimer: NodeJS.Timeout|null = null;
 const cooldownCache = new NodeCache({checkperiod: 5});
 const BID_COMMAND_ID = "firebot:bid";
 
 function purgeCaches() {
     cooldownCache.flushAll();
     activeBiddingInfo = {
-        "active": false,
-        "currentBid": 0,
-        "topBidder": ""
+        active: false,
+        currentBid: 0,
+        topBidder: "",
+        topBidderDisplayName: undefined
     };
 }
 
-async function stopBidding(chatter) {
-    clearTimeout(bidTimer);
+async function stopBidding(chatter: Chatter) {
+    if (bidTimer !== null) {
+        clearTimeout(bidTimer);
+        bidTimer = null;
+    }
     if (activeBiddingInfo.topBidder) {
         await twitchChat.sendChatMessage(`${activeBiddingInfo.topBidderDisplayName} has won the bidding with ${activeBiddingInfo.currentBid}!`, null, chatter);
     } else {
@@ -39,7 +67,7 @@ async function stopBidding(chatter) {
     purgeCaches();
 }
 
-const bidCommand = {
+const bidCommand: SystemCommand = {
     definition: {
         id: BID_COMMAND_ID,
         name: "Bid",
@@ -103,18 +131,18 @@ const bidCommand = {
     onTriggerEvent: async (event) => {
         const { chatMessage, userCommand } = event;
 
-        const bidSettings = gameManager.getGameSettings("firebot-bid");
+        const bidSettings = gameManager.getGameSettings<BidSettings>("firebot-bid");
         const chatter = bidSettings.settings.chatSettings.chatter;
 
         const currencyId = bidSettings.settings.currencySettings.currencyId;
         const currency = currencyAccess.getCurrencyById(currencyId);
         const currencyName = currency.name;
 
-        if (event.userCommand.subcommandId === "bidStart") {
+        if (userCommand.subcommandId === "bidStart") {
             const triggeredArg = userCommand.args[1];
             const bidAmount = parseInt(triggeredArg);
 
-            if (isNaN(bidAmount)) {
+            if (isNaN(bidAmount) || !isFinite(bidAmount)) {
                 await twitchChat.sendChatMessage(`Invalid amount. Please enter a number to start bidding.`, null, chatter, chatMessage.id);
                 return;
             }
@@ -130,9 +158,9 @@ const bidCommand = {
             }
 
             activeBiddingInfo = {
-                "active": true,
-                "currentBid": bidAmount,
-                "topBidder": ""
+                active: true,
+                currentBid: bidAmount,
+                topBidder: ""
             };
 
             const raiseMinimum = bidSettings.settings.currencySettings.minIncrement;
@@ -144,10 +172,9 @@ const bidCommand = {
                 await stopBidding(chatter);
             }, timeLimit);
 
-        } else if (event.userCommand.subcommandId === "bidStop") {
+        } else if (userCommand.subcommandId === "bidStop") {
             await stopBidding(chatter);
-        } else if (event.userCommand.subcommandId === "bidAmount") {
-
+        } else if (userCommand.subcommandId === "bidAmount") {
             const triggeredArg = userCommand.args[0];
             const bidAmount = parseInt(triggeredArg);
             const username = userCommand.commandSender;
@@ -176,7 +203,7 @@ const bidCommand = {
             }
 
             const minBid = bidSettings.settings.currencySettings.minBid;
-            if (minBid != null & minBid > 0) {
+            if (minBid !== undefined && minBid > 0) {
                 if (bidAmount < minBid) {
                     await twitchChat.sendChatMessage(`Bid amount must be at least ${minBid} ${currencyName}.`, null, chatter, chatMessage.id);
                     return;
@@ -237,6 +264,8 @@ function setNewHighBidder(username, userDisplayName, amount) {
     activeBiddingInfo.topBidderDisplayName = userDisplayName;
 }
 
-exports.purgeCaches = purgeCaches;
-exports.registerBidCommand = registerBidCommand;
-exports.unregisterBidCommand = unregisterBidCommand;
+export default {
+    purgeCaches,
+    registerBidCommand,
+    unregisterBidCommand
+};

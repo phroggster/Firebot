@@ -1,11 +1,9 @@
-"use strict";
-const twitchChat = require("../../../chat/twitch-chat");
-const util = require("../../../utility");
+import twitchChat from "../../../chat/twitch-chat";
+import util from "../../../utility";
 
 const SPIN_COUNT = 3;
 
-async function spin(showSpinInActionMsg, spinInActionMsg, successChance, chatter) {
-
+async function spin(showSpinInActionMsg: boolean, spinInActionMsg: string, successChance: number, chatter: "bot"|"streamer"): Promise<number> {
     let successCount = 0;
 
     if (showSpinInActionMsg) {
@@ -26,4 +24,6 @@ async function spin(showSpinInActionMsg, spinInActionMsg, successChance, chatter
     return successCount;
 }
 
-exports.spin = spin;
+export default {
+    spin
+};

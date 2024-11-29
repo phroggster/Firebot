@@ -1,9 +1,7 @@
-"use strict";
-const triviaCommand = require("./trivia-command");
-/**
- * @type {import('../../game-manager').FirebotGame}
- */
-module.exports = {
+import triviaCommand from "./trivia-command";
+import { GameDefinition } from "../../../../types/games";
+
+const triviaGame: GameDefinition = {
     id: "firebot-trivia",
     name: "Trivia",
     subtitle: "Knowledge is power",
@@ -65,6 +63,7 @@ module.exports = {
                     title: "Enabled Categories",
                     description: "Categories of questions that are enabled",
                     default: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26, 27, 28, 29, 30, 31, 32],
+                    // TODO: multiselect typings
                     settings: {
                         options: [
                             {
@@ -240,6 +239,7 @@ module.exports = {
                     description: "The winnings multiplier per user role for Easy questions",
                     tip: "The winnings are calculated as: WagerAmount * Multiplier",
                     sortRank: 1,
+                    // TODO: role-numbers typings
                     settings: {
                         defaultBase: 1.50,
                         defaultOther: 1.60,
@@ -326,3 +326,5 @@ module.exports = {
         triviaCommand.purgeCaches();
     }
 };
+
+export default triviaGame;

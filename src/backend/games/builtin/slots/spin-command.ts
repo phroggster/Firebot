@@ -1,26 +1,63 @@
-"use strict";
+import util from "../../../utility";
+import twitchChat from "../../../chat/twitch-chat";
+import commandManager from "../../../chat/commands/command-manager";
+import gameManager from "../../game-manager";
+import currencyAccess from "../../../currency/currency-access";
+import currencyManager from "../../../currency/currency-manager";
+import customRolesManager from "../../../roles/custom-roles-manager";
+import teamRolesManager from "../../../roles/team-roles-manager";
+import twitchRolesManager from "../../../../shared/twitch-roles";
+import slotMachine from "./slot-machine";
+import logger from "../../../logwrapper";
+import twitchApi from "../../../twitch-api/api";
+import { SystemCommand } from "../../../../types/commands";
 
-const util = require("../../../utility");
-const twitchChat = require("../../../chat/twitch-chat");
-const commandManager = require("../../../chat/commands/command-manager");
-const gameManager = require("../../game-manager");
-const currencyAccess = require("../../../currency/currency-access").default;
-const currencyManager = require("../../../currency/currency-manager");
-const customRolesManager = require("../../../roles/custom-roles-manager");
-const teamRolesManager = require("../../../roles/team-roles-manager");
-const twitchRolesManager = require("../../../../shared/twitch-roles");
-const slotMachine = require("./slot-machine");
-const logger = require("../../../logwrapper");
-const moment = require("moment");
-const NodeCache = require("node-cache");
-const twitchApi = require("../../../twitch-api/api");
+import moment from "moment";
+import NodeCache from "node-cache";
+
+type SlotSettings = {
+    currencySettings: {
+        currencyId: string;
+        defaultWager?: number|null;
+        minWager?: number|null;
+        maxWager?: number|null;
+    };
+    spinSettings: {
+        successChances?: {
+            basePercent: number;
+            roles?: {
+                roleId: string;
+                percent: number;
+            }[];
+        };
+        multiplier: number;
+    };
+    cooldownSettings: {
+        cooldown: number;
+    }
+    generalMessages: {
+        alreadySpinning: string;
+        onCooldown: string;
+        noWagerAmount: string;
+        invalidWagerAmount: string;
+        moreThanZero: string;
+        minWager: string;
+        maxWager: string;
+        notEnough: string;
+        spinInAction: string;
+        spinSuccessful: string;
+    };
+    chatSettings: {
+        chatter: "bot"|"streamer";
+    };
+};
 
 const activeSpinners = new NodeCache({checkperiod: 2});
 const cooldownCache = new NodeCache({checkperiod: 5});
 
 const SPIN_COMMAND_ID = "firebot:spin";
 
-const spinCommand = {
+const spinCommand: SystemCommand = {
     definition: {
         id: SPIN_COMMAND_ID,
         name: "Spin (Slots)",
@@ -42,10 +79,9 @@ const spinCommand = {
         ]
     },
     onTriggerEvent: async (event) => {
-
         const { userCommand } = event;
 
-        const slotsSettings = gameManager.getGameSettings("firebot-slots");
+        const slotsSettings = gameManager.getGameSettings<SlotSettings>("firebot-slots");
         const chatter = slotsSettings.settings.chatSettings.chatter;
         const username = userCommand.commandSender;
         const user = await twitchApi.users.getUserByName(username);
@@ -55,7 +91,7 @@ const spinCommand = {
         }
 
         // parse the wager amount
-        let wagerAmount;
+        let wagerAmount: number;
         if (event.userCommand.args.length < 1) {
             const defaultWager = slotsSettings.settings.currencySettings.defaultWager;
             if (defaultWager == null || defaultWager < 1) {
@@ -99,7 +135,8 @@ const spinCommand = {
             if (slotsSettings.settings.generalMessages.onCooldown) {
                 const timeRemainingDisplay = util.secondsForHumans(Math.abs(moment().diff(cooldownExpireTime, 'seconds')));
                 const cooldownMsg = slotsSettings.settings.generalMessages.onCooldown
-                    .replace("{username}", user.displayName).replace("{timeRemaining}", timeRemainingDisplay);
+                    .replace("{username}", user.displayName)
+                    .replace("{timeRemaining}", timeRemainingDisplay);
 
                 await twitchChat.sendChatMessage(cooldownMsg, null, chatter);
             }
@@ -119,11 +156,12 @@ const spinCommand = {
         }
 
         const minWager = slotsSettings.settings.currencySettings.minWager;
-        if (minWager != null & minWager > 0) {
+        if (minWager != null && minWager > 0) {
             if (wagerAmount < minWager) {
                 if (slotsSettings.settings.generalMessages.minWager) {
                     const minWagerMsg = slotsSettings.settings.generalMessages.minWager
-                        .replace("{username}", user.displayName).replace("{minWager}", minWager);
+                        .replace("{username}", user.displayName)
+                        .replace("{minWager}", `${minWager}`);
 
                     await twitchChat.sendChatMessage(minWagerMsg, null, chatter);
                 }
@@ -132,11 +170,12 @@ const spinCommand = {
             }
         }
         const maxWager = slotsSettings.settings.currencySettings.maxWager;
-        if (maxWager != null & maxWager > 0) {
+        if (maxWager != null && maxWager > 0) {
             if (wagerAmount > maxWager) {
                 if (slotsSettings.settings.generalMessages.maxWager) {
                     const maxWagerMsg = slotsSettings.settings.generalMessages.maxWager
-                        .replace("{username}", user.displayName).replace("{maxWager}", maxWager);
+                        .replace("{username}", user.displayName)
+                        .replace("{maxWager}", `${maxWager}`);
 
                     await twitchChat.sendChatMessage(maxWagerMsg, null, chatter);
                 }
@@ -146,7 +185,7 @@ const spinCommand = {
         }
 
         const currencyId = slotsSettings.settings.currencySettings.currencyId;
-        let userBalance;
+        let userBalance: number;
         try {
             userBalance = await currencyManager.getViewerCurrencyAmount(username, currencyId);
         } catch (error) {
@@ -228,14 +267,13 @@ const spinCommand = {
 
             const spinSuccessfulMsg = slotsSettings.settings.generalMessages.spinSuccessful
                 .replace("{username}", user.displayName)
-                .replace("{successfulRolls}", successfulRolls)
+                .replace("{successfulRolls}", `${successfulRolls}`)
                 .replace("{winningsAmount}", util.commafy(winnings))
                 .replace("{currencyName}", currency.name);
             await twitchChat.sendChatMessage(spinSuccessfulMsg, null, chatter);
         }
 
         activeSpinners.del(username);
-
     }
 };
 
@@ -254,6 +292,8 @@ function purgeCaches() {
     activeSpinners.flushAll();
 }
 
-exports.purgeCaches = purgeCaches;
-exports.registerSpinCommand = registerSpinCommand;
-exports.unregisterSpinCommand = unregisterSpinCommand;
+export default {
+    purgeCaches,
+    registerSpinCommand,
+    unregisterSpinCommand
+};

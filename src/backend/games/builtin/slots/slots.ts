@@ -1,11 +1,7 @@
-"use strict";
+import spinCommand from "./spin-command";
+import { GameDefinition } from "../../../../types/games";
 
-const spinCommand = require("./spin-command");
-
-/**
- * @type {import('../../game-manager').FirebotGame}
- */
-module.exports = {
+const slotsGame: GameDefinition = {
     id: "firebot-slots",
     name: "Slots",
     subtitle: "Spin to win",
@@ -217,3 +213,5 @@ module.exports = {
         spinCommand.purgeCaches();
     }
 };
+
+export default slotsGame;

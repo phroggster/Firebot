@@ -1,20 +1,56 @@
-"use strict";
+import triviaHelper from "./trivia-helper";
+import util from "../../../utility";
+import twitchChat from "../../../chat/twitch-chat";
+import twitchListeners from "../../../chat/chat-listeners/twitch-chat-listeners";
+import commandManager from "../../../chat/commands/command-manager";
+import gameManager from "../../game-manager";
+import currencyAccess from "../../../currency/currency-access";
+import currencyManager from "../../../currency/currency-manager";
+import customRolesManager from "../../../roles/custom-roles-manager";
+import teamRolesManager from "../../../roles/team-roles-manager";
+import twitchRolesManager from "../../../../shared/twitch-roles";
+import logger from "../../../logwrapper";
+import twitchApi from "../../../twitch-api/api";
+import { FirebotChatMessage } from "../../../../types/chat";
+import { SystemCommand } from "../../../../types/commands";
+import moment from "moment";
+import NodeCache from "node-cache";
 
-const util = require("../../../utility");
-const twitchChat = require("../../../chat/twitch-chat");
-const twitchListeners = require("../../../chat/chat-listeners/twitch-chat-listeners");
-const commandManager = require("../../../chat/commands/command-manager");
-const gameManager = require("../../game-manager");
-const currencyAccess = require("../../../currency/currency-access").default;
-const currencyManager = require("../../../currency/currency-manager");
-const customRolesManager = require("../../../roles/custom-roles-manager");
-const teamRolesManager = require("../../../roles/team-roles-manager");
-const twitchRolesManager = require("../../../../shared/twitch-roles");
-const logger = require("../../../logwrapper");
-const moment = require("moment");
-const triviaHelper = require("./trivia-helper");
-const NodeCache = require("node-cache");
-const twitchApi = require("../../../twitch-api/api");
+type RoleNumbers = {
+    base: number;
+    roles: {
+        roleId: string;
+        value: number;
+    }[];
+};
+
+type TriviaSettings = {
+    currencySettings: {
+        currencyId: string;
+        defaultWager?: number|null;
+        minWager: number;
+        maxWager?: number|null;
+    };
+    questionSettings: {
+        enabledCategories: number[];
+        enabledDifficulties: "easy"|"medium"|"hard"[];
+        enabledTypes: "boolean"|"multiple"[];
+        answerTime: number;
+    };
+    multiplierSettings: {
+        base: number;
+        easyMultipliers: RoleNumbers;
+        mediumMultipliers: RoleNumbers;
+        hardMultipliers: RoleNumbers;
+    };
+    cooldownSettings: {
+        cooldown?: number|null;
+    };
+    chatSettings: {
+        chatter: "bot"|"streamer";
+        noWagerMessage: string;
+    };
+};
 
 let fiveSecTimeoutId;
 let answerTimeoutId;
@@ -32,8 +68,7 @@ function clearCurrentQuestion() {
     }
 }
 
-twitchListeners.events.on("chat-message", async (data) => {
-    /**@type {import("../../../../types/chat").FirebotChatMessage} */
+twitchListeners.events.on("chat-message", async (data: FirebotChatMessage) => {
     const chatMessage = data;
     if (!currentQuestion) {
         return;
@@ -78,7 +113,7 @@ const cooldownCache = new NodeCache({checkperiod: 5});
 
 const TRIVIA_COMMAND_ID = "firebot:trivia";
 
-const triviaCommand = {
+const triviaCommand: SystemCommand = {
     definition: {
         id: TRIVIA_COMMAND_ID,
         name: "Trivia",
@@ -103,7 +138,7 @@ const triviaCommand = {
 
         const { userCommand } = event;
 
-        const triviaSettings = gameManager.getGameSettings("firebot-trivia");
+        const triviaSettings = gameManager.getGameSettings<TriviaSettings>("firebot-trivia");
         const chatter = triviaSettings.settings.chatSettings.chatter;
 
         const username = userCommand.commandSender;
@@ -139,14 +174,14 @@ const triviaCommand = {
             }
 
             const minWager = triviaSettings.settings.currencySettings.minWager;
-            if (minWager != null & minWager > 0) {
+            if (minWager != null && minWager > 0) {
                 if (wagerAmount < minWager) {
                     await twitchChat.sendChatMessage(`${user.displayName}, your wager amount must be at least ${minWager}.`, null, chatter);
                     return;
                 }
             }
             const maxWager = triviaSettings.settings.currencySettings.maxWager;
-            if (maxWager != null & maxWager > 0) {
+            if (maxWager != null && maxWager > 0) {
                 if (wagerAmount > maxWager) {
                     await twitchChat.sendChatMessage(`${user.displayName}, your wager amount can be no more than ${maxWager}.`, null, chatter);
                     return;
@@ -209,7 +244,7 @@ const triviaCommand = {
 
             const multiplierSettings = triviaSettings.settings.multiplierSettings;
 
-            let winningsMultiplierSettings;
+            let winningsMultiplierSettings: RoleNumbers = undefined;
             if (question.difficulty === "easy") {
                 winningsMultiplierSettings = multiplierSettings.easyMultipliers;
             }
@@ -268,21 +303,25 @@ const triviaCommand = {
     }
 };
 
-function registerTriviaCommand() {
+
+function registerTriviaCommand(): void {
     if (!commandManager.hasSystemCommand(TRIVIA_COMMAND_ID)) {
         commandManager.registerSystemCommand(triviaCommand);
     }
 }
 
-function unregisterTriviaCommand() {
+function unregisterTriviaCommand(): void {
     commandManager.unregisterSystemCommand(TRIVIA_COMMAND_ID);
 }
 
-function purgeCaches() {
+function purgeCaches(): void {
     cooldownCache.flushAll();
     clearCurrentQuestion();
 }
 
-exports.purgeCaches = purgeCaches;
-exports.registerTriviaCommand = registerTriviaCommand;
-exports.unregisterTriviaCommand = unregisterTriviaCommand;
+
+export default {
+    purgeCaches,
+    registerTriviaCommand,
+    unregisterTriviaCommand
+};
