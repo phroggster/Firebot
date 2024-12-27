@@ -19,7 +19,7 @@
                         <span>{{sis.streamInfo.viewers}}</span>
                     </div>
 
-                    <hype-train-indicator ng-if="settings.getSetting('ShowHypeTrainIndicator') && hts.hypeTrainActive"></hype-train-indicator>
+                    <hype-train-indicator ></hype-train-indicator>
 
                     <ad-break-indicator ng-if="settings.getSetting('ShowAdBreakIndicator') && abs.showAdBreakTimer"></ad-break-service>
                 </div>

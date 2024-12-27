@@ -32,7 +32,7 @@
 
                 $scope.hts = hypeTrainService;
 
-                $scope.timeLeftDisplay = "0:00";
+            $scope.timeLeftDisplay = "4:20";
 
                 function updateTimeLeftDisplay() {
 
@@ -60,12 +60,12 @@
                     $scope.timeLeftDisplay = `${minDisplay}:${secDisplay}`;
                 }
 
-                $ctrl.$onInit = function() {
-                    updateTimeLeftDisplay();
+            $ctrl.$onInit = function () {
+                //updateTimeLeftDisplay();
                 };
 
                 $interval(() => {
-                    updateTimeLeftDisplay();
+                //updateTimeLeftDisplay();
                 }, 1000);
             }
         });
