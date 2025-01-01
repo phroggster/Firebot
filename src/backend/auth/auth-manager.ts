@@ -2,20 +2,20 @@ import { EventEmitter } from "events";
 import ClientOAuth2 from "client-oauth2";
 import logger from "../logwrapper";
 import { AuthProvider, AuthProviderDefinition } from "./auth";
-import { settings } from "../common/settings-access";
+import { SettingsManager } from "../common/settings-manager";
 import frontendCommunicator from "../common/frontend-communicator";
 import { Notification, app } from "electron";
 import windowManagement from "../app-management/electron/window-management";
 
 class AuthManager extends EventEmitter {
-    private readonly _httpPort: string;
+    private readonly _httpPort: number;
     private _authProviders: AuthProvider[];
 
     constructor() {
         super();
 
         this._authProviders = [];
-        this._httpPort = settings.getWebServerPort();
+        this._httpPort = SettingsManager.getSetting("WebServerPort");
     }
 
     registerAuthProvider(provider: AuthProviderDefinition): void {
@@ -40,7 +40,7 @@ class AuthManager extends EventEmitter {
                 break;
 
             case "device":
-                authorizationUri = `${provider.auth.tokenHost}${provider.auth.authorizePath}`;
+                authorizationUri = `${provider.auth.authorizeHost ?? provider.auth.tokenHost}${provider.auth.authorizePath}`;
                 break;
         }
 
@@ -62,7 +62,7 @@ class AuthManager extends EventEmitter {
     }
 
     getAuthProvider(providerId: string): AuthProvider {
-        return this._authProviders.find((p) => p.id === providerId);
+        return this._authProviders.find(p => p.id === providerId);
     }
 
     buildOAuthClientForProvider(provider: AuthProviderDefinition, redirectUri: string): ClientOAuth2 {
@@ -75,7 +75,7 @@ class AuthManager extends EventEmitter {
             scopes = [];
         }
 
-        const authUri = `${provider.auth.tokenHost}${provider.auth.authorizePath}`;
+        const authUri = `${provider.auth.authorizeHost ?? provider.auth.tokenHost}${provider.auth.authorizePath}`;
         const tokenUri = `${provider.auth.tokenHost}${provider.auth.tokenPath ?? ""}`;
 
         return new ClientOAuth2({

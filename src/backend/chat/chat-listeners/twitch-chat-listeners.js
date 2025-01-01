@@ -9,6 +9,7 @@ const chatModerationManager = require("../moderation/chat-moderation-manager");
 const chatRolesManager = require("../../roles/chat-roles-manager");
 const twitchEventsHandler = require("../../events/twitch-events");
 const raidMessageChecker = require(".././moderation/raid-message-checker");
+const viewerDatabase = require("../../viewers/viewer-database");
 const logger = require("../../logwrapper");
 
 const events = require("events");
@@ -40,11 +41,12 @@ exports.setupChatListeners = (streamerChatClient, botChatClient) => {
         frontendCommunicator.send("twitch:chat:message", firebotChatMessage);
 
         twitchEventsHandler.announcement.triggerAnnouncement(
-            firebotChatMessage.userIdName,
-            firebotChatMessage.userId,
             firebotChatMessage.username,
+            firebotChatMessage.userId,
+            firebotChatMessage.userDisplayName,
             firebotChatMessage.roles,
-            firebotChatMessage.rawText
+            firebotChatMessage.rawText,
+            firebotChatMessage.id
         );
     });
 
@@ -54,9 +56,13 @@ exports.setupChatListeners = (streamerChatClient, botChatClient) => {
         await chatModerationManager.moderateMessage(firebotChatMessage);
 
         if (firebotChatMessage.isVip === true) {
-            chatRolesManager.addVipToVipList(firebotChatMessage.username);
+            chatRolesManager.addVipToVipList({
+                id: msg.userInfo.userId,
+                username: msg.userInfo.userName,
+                displayName: msg.userInfo.displayName
+            });
         } else {
-            chatRolesManager.removeVipFromVipList(firebotChatMessage.username);
+            chatRolesManager.removeVipFromVipList(msg.userInfo.userId);
         }
 
         // send to the frontend
@@ -67,7 +73,8 @@ exports.setupChatListeners = (streamerChatClient, botChatClient) => {
                 messageText: firebotChatMessage.rawText,
                 user: {
                     id: firebotChatMessage.userId,
-                    username: firebotChatMessage.username
+                    username: firebotChatMessage.username,
+                    displayName: firebotChatMessage.userDisplayName
                 },
                 reward: {
                     id: HIGHLIGHT_MESSAGE_REWARD_ID,
@@ -85,9 +92,9 @@ exports.setupChatListeners = (streamerChatClient, botChatClient) => {
         await activeUserHandler.addActiveUser(msg.userInfo, true);
 
         twitchEventsHandler.viewerArrived.triggerViewerArrived(
-            msg.userInfo.displayName,
             msg.userInfo.userName,
             msg.userInfo.userId,
+            msg.userInfo.displayName,
             messageText,
             firebotChatMessage
         );
@@ -102,7 +109,10 @@ exports.setupChatListeners = (streamerChatClient, botChatClient) => {
         if (firebotChatMessage.isFirstChat) {
             twitchEventsHandler.chat.triggerFirstTimeChat(firebotChatMessage);
         }
-        await raidMessageChecker.sendMessageToCache(firebotChatMessage);
+        await raidMessageChecker.sendMessageToCache({
+            rawText: firebotChatMessage.rawText,
+            userId: firebotChatMessage.userId
+        });
     });
 
     const whisperHandler = async (_user, messageText, msg, accountType) => {
@@ -114,6 +124,8 @@ exports.setupChatListeners = (streamerChatClient, botChatClient) => {
 
         twitchEventsHandler.whisper.triggerWhisper(
             msg.userInfo.userName,
+            msg.userInfo.userId,
+            msg.userInfo.displayName,
             messageText,
             accountType
         );
@@ -126,12 +138,18 @@ exports.setupChatListeners = (streamerChatClient, botChatClient) => {
         const firebotChatMessage = await chatHelpers.buildFirebotChatMessage(msg, messageText, false, true);
 
         if (firebotChatMessage.isVip === true) {
-            chatRolesManager.addVipToVipList(firebotChatMessage.username);
+            chatRolesManager.addVipToVipList({
+                id: msg.userInfo.userId,
+                username: msg.userInfo.userName,
+                displayName: msg.userInfo.displayName
+            });
         } else {
-            chatRolesManager.removeVipFromVipList(firebotChatMessage.username);
+            chatRolesManager.removeVipFromVipList(msg.userInfo.userId);
         }
 
         frontendCommunicator.send("twitch:chat:message", firebotChatMessage);
+
+        chatCommandHandler.handleChatMessage(firebotChatMessage);
 
         await activeUserHandler.addActiveUser(msg.userInfo, true);
 
@@ -141,9 +159,9 @@ exports.setupChatListeners = (streamerChatClient, botChatClient) => {
         }
 
         twitchEventsHandler.viewerArrived.triggerViewerArrived(
-            msg.userInfo.displayName,
             msg.userInfo.userName,
             msg.userInfo.userId,
+            msg.userInfo.displayName,
             messageText,
             firebotChatMessage
         );
@@ -179,6 +197,7 @@ exports.setupChatListeners = (streamerChatClient, botChatClient) => {
         } catch (error) {
             logger.error("Failed to parse resub message", error);
         }
+        viewerDatabase.calculateAutoRanks(subInfo.userId);
     });
 
     streamerChatClient.onCommunitySub((_channel, _user, subInfo) => {
@@ -201,15 +220,17 @@ exports.setupChatListeners = (streamerChatClient, botChatClient) => {
             subInfo.months,
             subInfo.streak ?? 1
         );
+        viewerDatabase.calculateAutoRanks(subInfo.userId);
     });
 
     streamerChatClient.onGiftPaidUpgrade((_channel, _user, subInfo, msg) => {
         twitchEventsHandler.giftSub.triggerSubGiftUpgrade(
             msg.userInfo.userName,
-            subInfo.displayName,
             subInfo.userId,
+            subInfo.displayName,
             subInfo.gifterDisplayName,
             subInfo.plan
         );
+        viewerDatabase.calculateAutoRanks(subInfo.userId);
     });
 };

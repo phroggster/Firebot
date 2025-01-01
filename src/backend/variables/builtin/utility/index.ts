@@ -7,11 +7,13 @@ import evalJS from './eval-js';
 import evalVars from './eval-vars';
 import fileExists from './file-exists';
 import fileLineCount from './file-line-count';
+import fileName from './file-name';
 import fileRead from './file-read';
 import filesInDirectory from './files-in-directory';
 import loopCount from './loop-count';
 import loopItem from './loop-item';
 import quickstore from './quick-store';
+import randomUUID from './random-uuid';
 import runEffect from './run-effect';
 import videoDuration from './video-duration';
 
@@ -25,11 +27,13 @@ export default [
     evalVars,
     fileExists,
     fileLineCount,
+    fileName,
     fileRead,
     filesInDirectory,
     loopCount,
     loopItem,
     quickstore,
+    randomUUID,
     runEffect,
     videoDuration
 ];

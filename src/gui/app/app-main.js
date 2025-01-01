@@ -33,7 +33,14 @@
         'color.picker',
         'ngAria',
         'ui.codemirror'
-    ]);
+    ], function($controllerProvider, $compileProvider, $provide, $filterProvider) {
+        global.ngProviders = {
+            $controllerProvider: $controllerProvider,
+            $compileProvider: $compileProvider,
+            $provide: $provide,
+            $filterProvider: $filterProvider
+        };
+    });
 
     app.factory("$exceptionHandler", function(logger) {
     // this catches angular exceptions so we can send it to winston
@@ -80,6 +87,10 @@
         ]);
     });
 
+    app.config(function($animateProvider) {
+        $animateProvider.classNameFilter(/^(?:(?!ng-animate-disabled).)*$/);
+    });
+
     app.config([
         "ngToastProvider",
         function(ngToast) {
@@ -102,6 +113,7 @@
         chatMessagesService,
         activityFeedService,
         viewerRolesService,
+        viewerRanksService,
         connectionService,
         notificationService,
         $timeout,
@@ -123,14 +135,17 @@
         sortTagsService,
         iconsService,
         videoService,
-        replaceVariableService
+        replaceVariableService,
+        variableMacroService,
+        uiExtensionsService
     ) {
         // 'chatMessagesService' and 'videoService' are included so they're instantiated on app start
 
         connectionService.loadProfiles();
 
-        //load viewer roles
+        //load viewer roles and ranks
         viewerRolesService.loadCustomRoles();
+        viewerRanksService.loadRankLadders();
 
         //load commands
         commandsService.refreshCommands();
@@ -157,10 +172,13 @@
         effectQueuesService.loadEffectQueues();
 
         channelRewardsService.loadChannelRewards();
+        channelRewardsService.refreshChannelRewardRedemptions();
 
         sortTagsService.loadSortTags();
 
         iconsService.loadFontAwesomeIcons();
+
+        variableMacroService.loadMacros();
 
         //start notification check
         $timeout(() => {
@@ -176,14 +194,16 @@
         connectionService.validateAccounts();
 
         ttsService.obtainVoices().then(() => {
-            if (settingsService.getDefaultTtsVoiceId() == null) {
-                settingsService.setDefaultTtsVoiceId(ttsService.getOsDefaultVoiceId());
+            if (settingsService.getSetting("DefaultTtsVoiceId") == null) {
+                settingsService.saveSetting("DefaultTtsVoiceId", ttsService.getOsDefaultVoiceId());
             }
         });
+
+        uiExtensionsService.setAsReady();
     });
 
     app.controller("MainController", function($scope, $rootScope, $timeout, connectionService, utilityService,
-        settingsService, backupService, sidebarManager, logger, backendCommunicator) {
+        settingsService, backupService, sidebarManager, logger, backendCommunicator, fontManager) {
         $rootScope.showSpinner = true;
 
         $scope.fontAwesome5KitUrl = `https://kit.fontawesome.com/${secrets.fontAwesome5KitId}.js`;
@@ -370,12 +390,12 @@
         //$scope.accounts = connectionService.accounts;
         //$scope.profiles = connectionService.profiles;
 
-        if (settingsService.hasJustUpdated()) {
+        if (settingsService.getSetting("JustUpdated")) {
             utilityService.showUpdatedModal();
-            settingsService.setJustUpdated(false);
-        } else if (settingsService.isFirstTimeUse()) {
+            settingsService.saveSetting("JustUpdated", false);
+        } else if (settingsService.getSetting("FirstTimeUse")) {
             utilityService.showSetupWizard();
-            settingsService.setFirstTimeUse(false);
+            settingsService.saveSetting("FirstTimeUse", false);
         }
 
         /**
@@ -386,7 +406,12 @@
         const appVersion = firebotAppDetails.version;
         $scope.appTitle = `Firebot v${appVersion}`;
 
-        $scope.customFontCssPath = profileManager.getPathInProfile("/fonts/fonts.css");
+        const url = require("url");
+        $scope.customFontCssPath = url.pathToFileURL(fontManager.getFontCssPath());
+
+        backendCommunicator.on("fonts:reload-font-css", () => {
+            $scope.customFontCssPath = `${url.pathToFileURL(fontManager.getFontCssPath())}?reload=${new Date().getTime()}`;
+        });
 
         //make sure sliders render properly
         $timeout(function() {
@@ -395,7 +420,7 @@
 
         // Apply Theme
         $scope.appTheme = function() {
-            return settingsService.getTheme();
+            return settingsService.getSetting("Theme");
         };
 
         $rootScope.showSpinner = false;
@@ -422,7 +447,7 @@
             });
         });
 
-        backendCommunicator.on("restore-backup", () => {
+        backendCommunicator.on("backups:start-restore-backup", () => {
             backupService.openBackupZipFilePicker()
                 .then((backupFilePath) => {
                     if (backupFilePath != null) {
@@ -460,6 +485,12 @@
         };
     });
 
+    app.filter("dynamicFilter", function($filter) {
+        return function(items, filterName, ...args) {
+            return $filter(filterName ?? "filter")(items, ...args);
+        };
+    });
+
     // This adds a filter that we can use for searching command triggers
     app.filter("triggerSearch", function() {
         return function(commands, query) {
@@ -490,7 +521,7 @@
 
     app.filter("hideBotMessages", function(settingsService, accountAccess) {
         return function(elements) {
-            const shouldHide = settingsService.chatHideBotAccountMessages();
+            const shouldHide = settingsService.getSetting("ChatHideBotAccountMessages");
             if (!shouldHide) {
                 return elements;
             }
@@ -507,7 +538,7 @@
 
     app.filter("hideWhispers", function(settingsService) {
         return function(elements) {
-            const shouldHide = settingsService.getChatHideWhispers();
+            const shouldHide = settingsService.getSetting("ChatHideWhispers");
             if (!shouldHide) {
                 return elements;
             }
@@ -557,7 +588,7 @@
             const normalizedQuery = query.replace("$", "").toLowerCase();
             return variables
                 .filter(v =>
-                    v.handle.toLowerCase().includes(normalizedQuery)
+                    v.handle.toLowerCase().includes(normalizedQuery) || v.aliases?.some(a => a.toLowerCase().includes(normalizedQuery))
                 );
         };
     });
@@ -613,6 +644,24 @@
     app.filter('prettyDate', function() {
         return function(input) {
             return (input) ? moment(input).format('L') : 'Not saved';
+        };
+    });
+
+    app.filter('timeFromNow', function() {
+        return function(input, hideSuffix = false) {
+            return moment(input).fromNow(hideSuffix);
+        };
+    });
+
+    app.filter('hideEmptyRewardQueues', function() {
+        return function(queue) {
+            const newQueueObj = { ...queue };
+            for (const key in newQueueObj) {
+                if (newQueueObj[key].length === 0) {
+                    delete newQueueObj[key];
+                }
+            }
+            return newQueueObj;
         };
     });
 

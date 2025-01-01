@@ -12,12 +12,12 @@
             dismiss: "&",
             modalInstance: "<"
         },
-        controller: function($scope, utilityService, currencyService, viewerRolesService, logger) {
-            const uuidv1 = require("uuid/v1");
+        controller: function(utilityService, currencyService, viewerRolesService, logger) {
+            const { v4: uuid } = require("uuid");
             const $ctrl = this;
 
             $ctrl.currency = {
-                id: uuidv1(),
+                id: uuid(),
                 name: "Points",
                 active: true,
                 payout: 5,
@@ -34,19 +34,6 @@
                     $ctrl.currency = JSON.parse(JSON.stringify($ctrl.resolve.currency));
                 }
 
-                const modalId = $ctrl.resolve.modalId;
-                utilityService.addSlidingModal(
-                    $ctrl.modalInstance.rendered.then(() => {
-                        const modalElement = $(`.${modalId}`).children();
-                        return {
-                            element: modalElement,
-                            name: "Edit Currency",
-                            id: modalId,
-                            instance: $ctrl.modalInstance
-                        };
-                    })
-                );
-
                 // Set our transfer status.
                 $ctrl.setTransferEnabled = function(state) {
                     $ctrl.currency.transfer = state;
@@ -54,10 +41,6 @@
 
                 // Get the groups we want people to be able to give bonus currency to...
                 $ctrl.viewerRoles = viewerRolesService.getAllRoles().filter(r => r.id !== "Owner");
-
-                $scope.$on("modal.closing", function() {
-                    utilityService.removeSlidingModal();
-                });
             };
 
             $ctrl.delete = function() {
@@ -71,6 +54,18 @@
             $ctrl.save = function() {
                 if ($ctrl.currency.name == null || $ctrl.currency.name === "") {
                     return;
+                }
+
+                if ($ctrl.isNewCurrency && currencyService.currencies.some(c => c.name === $ctrl.currency.name)) {
+                    utilityService.showErrorModal(
+                        "You cannot create a currency with the same name as another currency!"
+                    );
+                    logger.error(`User tried to create currency with the same name as another currency: ${$ctrl.currency.name}.`);
+                    return;
+                }
+
+                if (!$ctrl.currency.offline) {
+                    $ctrl.currency.offline = undefined;
                 }
 
                 logger.debug($ctrl.currency);
@@ -94,7 +89,7 @@
                         question: "Are you sure you'd like to delete this currency?",
                         confirmLabel: "Delete"
                     })
-                    .then(confirmed => {
+                    .then((confirmed) => {
                         if (confirmed) {
                             currencyService.deleteCurrency(currency);
                             $ctrl.close({
@@ -117,7 +112,7 @@
               "Are you sure you'd like to purge this currency? This currency will be set to 0 for all users.",
                         confirmLabel: "Purge"
                     })
-                    .then(confirmed => {
+                    .then((confirmed) => {
                         if (confirmed) {
                             currencyService.purgeCurrency(currency.id);
                             $ctrl.close({

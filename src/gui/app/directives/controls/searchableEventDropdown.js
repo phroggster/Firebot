@@ -22,7 +22,7 @@
             update: "&"
         },
         template: `
-      <ui-select ng-model="$ctrl.selectedEvent" on-select="$ctrl.selectOption($item, $model)" theme="bootstrap">
+      <ui-select ng-model="$ctrl.selectedEvent" on-select="$ctrl.selectOption($item, $model)" theme="bootstrap" title="{{$select.selected != null ? $select.selected.name + ' ' + $select.selected.source.name : 'Select or search for an event...'}}">
         <ui-select-match placeholder="Select or search for an event... ">{{$select.selected.name}} ({{$select.selected.source.name}})</ui-select-match>
         <ui-select-choices repeat="option in $ctrl.options | eventfilter: $select.search" style="position:relative;">
           <div>
@@ -33,11 +33,11 @@
         </ui-select-choices>
       </ui-select>
       `,
-        controller: function(listenerService) {
+        controller: function(backendCommunicator) {
             const ctrl = this;
 
-            const events = listenerService.fireEventSync("getAllEvents", false);
-            const sources = listenerService.fireEventSync("getAllEventSources", false);
+            const events = backendCommunicator.fireEventSync("getAllEvents", false);
+            const sources = backendCommunicator.fireEventSync("getAllEventSources", false);
 
             const getSelected = () => {
                 // sort events by name
@@ -60,7 +60,7 @@
                 getSelected();
 
                 // Add source info to event objects for filtering
-                events.forEach(e => {
+                events.forEach((e) => {
                     e.source = {
                         id: e.sourceId,
                         name: ctrl.getSourceName(e.sourceId)

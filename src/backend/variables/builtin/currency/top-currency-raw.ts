@@ -7,9 +7,9 @@ import currencyManager from "../../../currency/currency-manager";
 const model : ReplaceVariable = {
     definition: {
         handle: "rawTopCurrency",
-        description: "Returns a raw array containing those with the most of the specified currency. Items in the array contain 'place', 'username' and 'amount' properties",
+        description: "Returns a raw array containing those with the most of the specified currency. Items in the array contain `place`, `username` and `amount` properties.",
         usage: "rawTopCurrency[currencyName]",
-        possibleDataOutput: [OutputDataType.TEXT]
+        possibleDataOutput: [OutputDataType.ARRAY]
     },
 
     // eslint-disable-next-line @typescript-eslint/no-inferrable-types
@@ -46,7 +46,9 @@ const model : ReplaceVariable = {
 
         const topHoldersDisplay = topCurrencyHolders.map((u, i) => ({
             place: i + 1,
-            username: u.displayName,
+            username: u.username,
+            userId: u._id,
+            userDisplayName: u.displayName,
             amount: u.currency[currency.id]
         }));
 

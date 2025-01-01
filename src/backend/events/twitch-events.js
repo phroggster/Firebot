@@ -1,5 +1,6 @@
 "use strict";
 
+exports.ad = require("./twitch-events/ad");
 exports.announcement = require('./twitch-events/announcement');
 exports.charity = require('./twitch-events/charity');
 exports.chat = require('./twitch-events/chat');

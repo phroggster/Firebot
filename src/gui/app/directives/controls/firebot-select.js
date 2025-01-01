@@ -1,6 +1,9 @@
 "use strict";
 
-(function() {
+(function () {
+
+    const { v4: uuid } = require("uuid");
+
     const firebotSelectComponent = {
         bindings: {
             options: "=",
@@ -8,53 +11,58 @@
             placeholder: "@",
             onUpdate: '&',
             isDisabled: '<',
-            rightJustify: "<?"
+            rightJustify: "<?",
+            ariaLabel: "@?"
         },
         template: `
         <div class="btn-group" uib-dropdown>
-            <button id="single-button" type="button" class="btn btn-default" uib-dropdown-toggle ng-disabled="$ctrl.isDisabled">
-            {{$ctrl.getSelectedOption()}} <span class="caret"></span>
+            <button id="{{$ctrl.id}}" aria-label="{{($ctrl.ariaLabel || 'Selected') + ': ' + $ctrl.getSelectedOption()}}" type="button" class="btn btn-default" uib-dropdown-toggle ng-disabled="$ctrl.isDisabled">
+            {{$ctrl.getSelectedOption()}} <span class="caret" aria-hidden="true"></span>
             </button>
-            <ul class="dropdown-menu" ng-class="$ctrl.rightJustify ? 'right-justified-dropdown' : ''" uib-dropdown-menu role="menu" aria-labelledby="single-button">
-                <li 
-                    ng-if="!$ctrl.objectMode" 
-                    ng-repeat="option in $ctrl.options" 
+            <ul class="dropdown-menu" ng-class="$ctrl.rightJustify ? 'right-justified-dropdown' : ''" uib-dropdown-menu role="menu" aria-labelledby="{{$ctrl.id}}">
+                <li
+                    ng-if="!$ctrl.objectMode"
+                    ng-repeat="option in $ctrl.options"
                     role="{{option === 'separator' ? 'separator' : 'menuitem'}}"
-                    ng-class="option === 'separator' ? 'separator' : null" 
+                    ng-class="option === 'separator' ? 'separator' : null"
                     ng-click="$ctrl.selectOption(option)"
+                    aria-label="{{option}}"
                 >
-                    <a href>{{option}}</a>
+                    <a href aria-hidden="true">{{option}}</a>
                 </li>
-                <li 
+                <li
                     ng-if="$ctrl.objectMode"
-                    ng-repeat="(value, label) in $ctrl.options" 
+                    ng-repeat="(value, label) in $ctrl.options"
                     role="{{value === 'separator' ? 'separator' : 'menuitem'}}"
-                    ng-class="value === 'separator' ? 'separator' : null" 
+                    ng-class="value === 'separator' ? 'separator' : null"
                     ng-click="$ctrl.selectOption(value)"
+                    aria-label="{{label}}"
                 >
-                    <a href>{{label}}</a>
+                    <a href aria-hidden="true">{{label}}</a>
                 </li>
             </ul>
         </div>
         `,
-        controller: function($timeout) {
+        controller: function ($timeout) {
 
             const ctrl = this;
 
+            ctrl.id = uuid();
+
             ctrl.objectMode = false;
 
-            ctrl.selectOption = function(option) {
+            ctrl.selectOption = function (option) {
                 if (option === 'separator') {
                     return;
                 }
 
                 ctrl.selected = option;
                 $timeout(() => {
-                    ctrl.onUpdate({option: option});
+                    ctrl.onUpdate({ option: option });
                 }, 1);
             };
 
-            ctrl.getSelectedOption = function() {
+            ctrl.getSelectedOption = function () {
                 if (ctrl.selected == null) {
                     return ctrl.placeholder;
                 }

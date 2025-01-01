@@ -15,9 +15,9 @@ export type FirebotParsedMessagePart = {
 export type FirebotChatMessage = {
     id: string;
     username: string;
-    userIdName: string;
-    profilePicUrl?: string;
     userId: string;
+    userDisplayName?: string;
+    profilePicUrl?: string;
     isExtension?: boolean;
     roles: string[];
     badges: unknown[];
@@ -55,6 +55,8 @@ export type FirebotChatMessage = {
     threadParentMessageId?: string;
     threadParentMessageSenderUserId?: string;
     threadParentMessageSenderDisplayName?: string;
+    isSharedChatMessage: boolean;
+    sharedChatRoomId?: string;
 };
 
 export type FirebotEmote = {

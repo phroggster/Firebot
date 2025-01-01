@@ -1,4 +1,5 @@
 "use strict";
+
 (function() {
     //This handles the Hotkeys tab
 
@@ -20,16 +21,17 @@
             $scope.openAddOrEditHotkeyModal = function(hotkey) {
                 utilityService.showModal({
                     component: "addOrEditHotkeyModal",
+                    breadcrumbName: "Edit Hotkey",
                     resolveObj: {
                         hotkey: () => hotkey
                     },
-                    closeCallback: resp => {
+                    closeCallback: (resp) => {
                         const action = resp.action,
                             hotkey = resp.hotkey;
 
                         switch (action) {
                             case "add":
-                                hotkeyService.saveHotkey(hotkey);
+                                hotkeyService.addHotkey(hotkey);
                                 break;
                             case "update":
                                 hotkeyService.updateHotkey(hotkey);
@@ -42,7 +44,7 @@
                                         confirmLabel: "Delete",
                                         confirmBtnType: "btn-danger"
                                     })
-                                    .then(confirmed => {
+                                    .then((confirmed) => {
                                         if (confirmed) {
                                             hotkeyService.deleteHotkey(hotkey);
                                         }

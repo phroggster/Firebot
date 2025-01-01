@@ -2,6 +2,12 @@ import logger from '../../logwrapper';
 import accountAccess from "../../common/account-access";
 import { ApiClient, HelixChatAnnouncementColor, HelixChatChatter, HelixSendChatAnnouncementParams, HelixUpdateChatSettingsParams } from "@twurple/api";
 
+interface ResultWithError<TResult, TError> {
+    success: boolean;
+    result?: TResult;
+    error?: TError;
+}
+
 export class TwitchChatApi {
     private _streamerClient: ApiClient;
     private _botClient: ApiClient;
@@ -20,13 +26,7 @@ export class TwitchChatApi {
         try {
             const streamerUserId: string = accountAccess.getAccounts().streamer.userId;
 
-            let result = await this._streamerClient.chat.getChatters(streamerUserId);
-            chatters.push(...result.data);
-
-            while (result.cursor) {
-                result = await this._streamerClient.chat.getChatters(streamerUserId, { after: result.cursor });
-                chatters.push(...result.data);
-            }
+            chatters.push(...await this._streamerClient.chat.getChattersPaginated(streamerUserId).getAll());
         } catch (error) {
             logger.error("Error getting chatter list", error.message);
         }
@@ -129,18 +129,19 @@ export class TwitchChatApi {
      * Sends a Twitch shoutout to another channel
      *
      * @param targetUserId The Twitch user ID whose channel to shoutout
+     * @returns true when successful, error message string when unsuccessful
      */
-    async sendShoutout(targetUserId: string): Promise<boolean> {
+    async sendShoutout(targetUserId: string): Promise<ResultWithError<undefined, string>> {
         const streamerId = accountAccess.getAccounts().streamer.userId;
 
         try {
             await this._streamerClient.chat.shoutoutUser(streamerId, targetUserId);
         } catch (error) {
             logger.error("Error sending shoutout", error.message);
-            return false;
+            const body = JSON.parse(error._body);
+            return { success: false, error: body.message };
         }
-
-        return true;
+        return { success: true };
     }
 
     /**
@@ -304,5 +305,20 @@ export class TwitchChatApi {
         }
 
         return false;
+    }
+
+    /**
+     * Gets the chat color for a user.
+     *
+     * @param targetUserId numerical ID of the user as sting.
+     * @returns the color as hex code, null if the user did not set a color, or undefined if the user is unknown.
+     */
+    async getColorForUser(targetUserId: string): Promise<string | null |undefined> {
+        try {
+            return await this._streamerClient.chat.getColorForUser(targetUserId);
+        } catch (error) {
+            logger.error("Error Receiving user color", error.message);
+            return null;
+        }
     }
 }

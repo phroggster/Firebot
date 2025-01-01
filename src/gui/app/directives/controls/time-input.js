@@ -9,7 +9,9 @@
                 ngModel: "<",
                 validationError: "<?",
                 large: "<?",
-                disabled: "<?"
+                disabled: "<?",
+                maxTimeUnit: "<?",
+                minTimeUnit: "<?"
             },
             require: { ngModelCtrl: 'ngModel' },
             template: `
@@ -34,29 +36,50 @@
                     "Seconds",
                     "Minutes",
                     "Hours",
-                    "Days"
+                    "Days",
+                    "Weeks",
+                    "Months",
+                    "Years"
                 ];
 
                 // units of time in secs
+                const SECOND = 1;
                 const MINUTE = 60;
                 const HOUR = 3600;
                 const DAY = 86400;
+                const WEEK = 7 * DAY;
+                const MONTH = 31 * DAY;
+                const YEAR = 365 * DAY;
 
                 function getTimeScaleSeconds(unit) {
-                    let timeScale = 1;
-                    if (unit === "Minutes") {
-                        timeScale = MINUTE;
-                    } else if (unit === "Hours") {
-                        timeScale = HOUR;
-                    } else if (unit === "Days") {
-                        timeScale = DAY;
+                    switch (unit) {
+                        case "Minutes":
+                            return MINUTE;
+                        case "Hours":
+                            return HOUR;
+                        case "Days":
+                            return DAY;
+                        case "Weeks":
+                            return WEEK;
+                        case "Months":
+                            return MONTH;
+                        case "Years":
+                            return YEAR;
+                        default:
+                            return SECOND;
                     }
-                    return timeScale;
                 }
 
-                $ctrl.selectedTimeUnit = $ctrl.timeUnits[0];
-
                 function determineTimeUnit(seconds) {
+                    if (seconds % YEAR === 0) {
+                        return "Years";
+                    }
+                    if (seconds % MONTH === 0) {
+                        return "Months";
+                    }
+                    if (seconds % WEEK === 0) {
+                        return "Weeks";
+                    }
                     if (seconds % DAY === 0) {
                         return "Days";
                     }
@@ -89,6 +112,16 @@
                 };
 
                 $ctrl.$onInit = () => {
+                    if ($ctrl.minTimeUnit != null && $ctrl.timeUnits.includes($ctrl.minTimeUnit)) {
+                        $ctrl.timeUnits = $ctrl.timeUnits.slice($ctrl.timeUnits.findIndex(unit => unit === $ctrl.minTimeUnit));
+                    }
+
+                    if ($ctrl.maxTimeUnit != null && $ctrl.timeUnits.includes($ctrl.maxTimeUnit)) {
+                        $ctrl.timeUnits.length = $ctrl.timeUnits.findIndex(unit => unit === $ctrl.maxTimeUnit) + 1;
+                    }
+
+                    $ctrl.selectedTimeUnit = $ctrl.timeUnits[0];
+
                     if ($ctrl.ngModel != null) {
                         $ctrl.selectedTimeUnit = determineTimeUnit($ctrl.ngModel);
 

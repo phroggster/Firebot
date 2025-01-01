@@ -16,18 +16,18 @@ const model = {
         <eos-container header="Selection Type" ng-init="showSubcommands = effect.subcommandId != null">
             <div ng-if="sortTags && sortTags.length">
                 <label class="control-fb control--radio">Single Command
-                    <input type="radio" ng-model="effect.selectionType" value="command" />
+                    <input type="radio" ng-model="effect.selectionType" value="command" ng-change="typeSelected()" />
                     <div class="control__indicator"></div>
                 </label>
                 <label class="control-fb control--radio">Commands With Tag
-                    <input type="radio" ng-model="effect.selectionType" value="sortTag" />
+                    <input type="radio" ng-model="effect.selectionType" value="sortTag" ng-change="typeSelected()" />
                     <div class="control__indicator"></div>
                 </label>
             </div>
 
             <ui-select ng-if="effect.selectionType && effect.selectionType === 'command'" ng-model="effect.commandId" theme="bootstrap" on-select="commandSelected($item, $model)">
                 <ui-select-match placeholder="Select or search for a command... ">{{$select.selected.trigger}}</ui-select-match>
-                <ui-select-choices repeat="command.id as command in commands | filter: { trigger: $select.search }" style="position:relative;">
+                <ui-select-choices repeat="command.id as command in commands | filter: { trigger: ($select.search.startsWith('!') ? $select.search.slice(1) : $select.search) }" style="position:relative;">
                     <div ng-bind-html="command.trigger | highlight: $select.search"></div>
                 </ui-select-choices>
             </ui-select>
@@ -144,7 +144,7 @@ const model = {
             const options = {};
             if ($scope.subcommands) {
                 $scope.subcommands.forEach((sc) => {
-                    options[sc.id] = sc.regex || sc.fallback ? (sc.usage || "").split(" ")[0] : sc.arg;
+                    options[sc.id] = sc.regex || sc.fallback ? (sc.usage || (sc.fallback ? "Fallback" : "")).split(" ")[0] : sc.arg;
                 });
             }
             $scope.subcommandOptions = options;
@@ -163,8 +163,25 @@ const model = {
             if (command.subCommands) {
                 $scope.subcommands = command.subCommands;
             }
+
+            if (command.fallbackSubcommand) {
+                $scope.subcommands.push(command.fallbackSubcommand);
+            }
+
             $scope.createSubcommandOptions();
         };
+
+        $scope.typeSelected = () => {
+            if ($scope.effect.selectionType === "sortTag") {
+                $scope.effect.commandId = null;
+                $scope.showSubcommands = false;
+                $scope.subcommands = [];
+                $scope.effect.subcommandId = null;
+            } else {
+                $scope.effect.sortTagId = null;
+            }
+        };
+
         $scope.commandSelected = (command) => {
             $scope.effect.commandId = command.id;
             $scope.getSubcommands();
@@ -198,7 +215,7 @@ const model = {
 
         if (effect.sortTagId != null && effect.selectionType === "sortTag") {
             const commandManager = require("../../chat/commands/command-manager");
-            const commands = commandManager.getAllCustomCommands().filter(c => c.sortTags.includes(effect.sortTagId));
+            const commands = commandManager.getAllCustomCommands().filter(c => c.sortTags?.includes(effect.sortTagId));
             commands.forEach(c => commandIds.push(c.id));
         }
 

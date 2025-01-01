@@ -63,18 +63,16 @@ const secondsForHumans = (seconds) => {
             continue;
         }
         returntext +=
-      ` ${
-          levels[i][0]
-      } ${
-          levels[i][0] === 1
-              ? levels[i][1].substr(0, levels[i][1].length - 1)
-              : levels[i][1]}`;
+            ` ${levels[i][0]
+            } ${levels[i][0] === 1
+                ? levels[i][1].substr(0, levels[i][1].length - 1)
+                : levels[i][1]}`;
     }
     return returntext.trim();
 };
 
 const formattedSeconds = (secs, simpleOutput = false) => {
-    const duration = Duration.fromDurationLike({ seconds: Math.round(secs)}).rescale();
+    const duration = Duration.fromDurationLike({ seconds: Math.round(secs) }).rescale();
 
     if (simpleOutput === true) {
         if (simpleOutput) {
@@ -285,6 +283,39 @@ const emptyFolder = async (folderPath) => {
     }
 };
 
+const findIndexIgnoreCase = (array, element) => {
+    if (Array.isArray(array)) {
+        element = element.toString().toLowerCase();
+        const search = array.findIndex(e => e.toString().toLowerCase() === element);
+        return search;
+    }
+
+    return -1;
+};
+
+/**
+ * extract a property from an object using a dot-notation property path
+ * @param {Object} obj input object
+ * @param {string} path dot-notation based property path
+ * @param {*} defaultValue default value if no value exists at the specified path
+ * @returns {*|undefined} value at path, defaultValue or undefined
+ */
+const extractPropertyWithPath = (obj, path, defaultValue = undefined) => {
+    const propertyPath = path.split(".");
+    let data = structuredClone(obj);
+    try {
+        for (const item of propertyPath) {
+            if (data === undefined) {
+                return defaultValue;
+            }
+            data = data[item];
+        }
+        return data ?? defaultValue;
+    } catch (_) {
+        return defaultValue;
+    }
+};
+
 exports.getRandomInt = getRandomInt;
 exports.escapeRegExp = escapeRegExp;
 exports.getUrlRegex = getUrlRegex;
@@ -305,3 +336,5 @@ exports.convertToString = convertToString;
 exports.deepClone = deepClone;
 exports.deepFreeze = deepFreeze;
 exports.emptyFolder = emptyFolder;
+exports.findIndexIgnoreCase = findIndexIgnoreCase;
+exports.extractPropertyWithPath = extractPropertyWithPath;

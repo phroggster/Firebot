@@ -7,7 +7,7 @@
         .controller("viewersController", function($route, $scope, viewersService, currencyService,
             utilityService, settingsService) {
 
-            $scope.viewerTablePageSize = settingsService.getViewerListPageSize();
+            $scope.viewerTablePageSize = settingsService.getSetting("ViewerListPageSize");
 
             $scope.showUserDetailsModal = (userId) => {
                 const closeFunc = () => {
@@ -74,7 +74,7 @@
                         'min-width': '125px'
                     },
                     sortable: true,
-                    cellTemplate: `{{data.displayName || data.username}}`,
+                    cellTemplate: `{{data.displayName || data.username}}<span ng-if="data.displayName && data.username.toLowerCase() !== data.displayName.toLowerCase()" class="muted"> ({{data.username}})</span>`,
                     cellController: () => {}
                 },
                 {

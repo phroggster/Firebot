@@ -7,6 +7,8 @@ import frontendCommunicator from "../../common/frontend-communicator";
 import twitchEventsHandler from '../../events/twitch-events';
 import twitchApi from "../api";
 import twitchStreamInfoPoll from "../stream-info-manager";
+import rewardManager from "../../channel-rewards/channel-reward-manager";
+import chatRolesManager from "../../roles/chat-roles-manager";
 
 class TwitchEventSubClient {
     private _eventSubListener: EventSubWsListener;
@@ -18,8 +20,8 @@ class TwitchEventSubClient {
         // Stream online
         const onlineSubscription = this._eventSubListener.onStreamOnline(streamer.userId, (event) => {
             twitchEventsHandler.stream.triggerStreamOnline(
-                event.broadcasterId,
                 event.broadcasterName,
+                event.broadcasterId,
                 event.broadcasterDisplayName
             );
         });
@@ -28,8 +30,8 @@ class TwitchEventSubClient {
         // Stream offline
         const offlineSubscription = this._eventSubListener.onStreamOffline(streamer.userId, (event) => {
             twitchEventsHandler.stream.triggerStreamOffline(
-                event.broadcasterId,
                 event.broadcasterName,
+                event.broadcasterId,
                 event.broadcasterDisplayName
             );
         });
@@ -38,8 +40,8 @@ class TwitchEventSubClient {
         // Follows
         const followSubscription = this._eventSubListener.onChannelFollow(streamer.userId, streamer.userId, (event) => {
             twitchEventsHandler.follow.triggerFollow(
-                event.userId,
                 event.userName,
+                event.userId,
                 event.userDisplayName
             );
         });
@@ -50,7 +52,7 @@ class TwitchEventSubClient {
             const totalBits = (await twitchApi.bits.getChannelBitsLeaderboard(1, "all", new Date(), event.userId))[0]?.amount ?? 0;
 
             twitchEventsHandler.cheer.triggerCheer(
-                event.userName,
+                event.userName ?? "ananonymouscheerer",
                 event.userId,
                 event.userDisplayName ?? "An Anonymous Cheerer",
                 event.isAnonymous,
@@ -91,13 +93,82 @@ class TwitchEventSubClient {
                 event.rewardCost,
                 imageUrl
             );
+
+            if (!reward.shouldRedemptionsSkipRequestQueue) {
+                rewardManager.refreshChannelRewardRedemptions();
+            }
         });
         this._subscriptions.push(customRewardRedemptionSubscription);
+
+        const customRewardRedemptionUpdateSubscription = this._eventSubListener.onChannelRedemptionUpdate(streamer.userId, async (event) => {
+            const reward = await twitchApi.channelRewards.getCustomChannelReward(event.rewardId);
+            let imageUrl = "";
+
+            if (reward && reward.defaultImage) {
+                const images = reward.defaultImage;
+                if (images.url4x) {
+                    imageUrl = images.url4x;
+                } else if (images.url2x) {
+                    imageUrl = images.url2x;
+                } else if (images.url1x) {
+                    imageUrl = images.url1x;
+                }
+            }
+
+            twitchEventsHandler.rewardRedemption.handleRewardUpdated(
+                event.id,
+                event.status,
+                event.input,
+                event.userId,
+                event.userName,
+                event.userDisplayName,
+                event.rewardId,
+                event.rewardTitle,
+                event.rewardPrompt,
+                event.rewardCost,
+                imageUrl
+            );
+
+            rewardManager.refreshChannelRewardRedemptions();
+        });
+        this._subscriptions.push(customRewardRedemptionUpdateSubscription);
+
+        // Incoming Raid
+        const incomingRaidSubscription = this._eventSubListener.onChannelRaidTo(streamer.userId, (event) => {
+            twitchEventsHandler.raid.triggerIncomingRaid(
+                event.raidingBroadcasterName,
+                event.raidingBroadcasterId,
+                event.raidingBroadcasterDisplayName,
+                event.viewers
+            );
+        });
+        this._subscriptions.push(incomingRaidSubscription);
+
+        // Outbound Raid Sent Off
+        const outboundRaidSubscription = this._eventSubListener.onChannelRaidFrom(streamer.userId, (event) => {
+            // sent off
+            if (event.raidingBroadcasterId === streamer.userId && event.raidedBroadcasterId !== streamer.userId) {
+                twitchEventsHandler.raid.triggerRaidSentOff(
+                    event.raidingBroadcasterName,
+                    event.raidingBroadcasterId,
+                    event.raidingBroadcasterDisplayName,
+                    event.raidedBroadcasterName,
+                    event.raidedBroadcasterId,
+                    event.raidedBroadcasterDisplayName,
+                    event.viewers
+                );
+            }
+        });
+        this._subscriptions.push(outboundRaidSubscription);
 
         // Shoutout sent to another channel
         const shoutoutSentSubscription = this._eventSubListener.onChannelShoutoutCreate(streamer.userId, streamer.userId, (event) => {
             twitchEventsHandler.shoutout.triggerShoutoutSent(
+                event.shoutedOutBroadcasterName,
+                event.shoutedOutBroadcasterId,
                 event.shoutedOutBroadcasterDisplayName,
+                event.moderatorName,
+                event.moderatorId,
                 event.moderatorDisplayName,
                 event.viewerCount
             );
@@ -107,6 +178,8 @@ class TwitchEventSubClient {
         // Shoutout received from another channel
         const shoutoutReceivedSubscription = this._eventSubListener.onChannelShoutoutReceive(streamer.userId, streamer.userId, (event) => {
             twitchEventsHandler.shoutout.triggerShoutoutReceived(
+                event.shoutingOutBroadcasterName,
+                event.shoutingOutBroadcasterId,
                 event.shoutingOutBroadcasterDisplayName,
                 event.viewerCount
             );
@@ -123,7 +196,8 @@ class TwitchEventSubClient {
                 event.startDate,
                 event.expiryDate,
                 event.lastContribution,
-                event.topContributors
+                event.topContributors,
+                event.isGoldenKappaTrain
             );
         });
         this._subscriptions.push(hypeTrainBeginSubscription);
@@ -138,7 +212,8 @@ class TwitchEventSubClient {
                 event.startDate,
                 event.expiryDate,
                 event.lastContribution,
-                event.topContributors
+                event.topContributors,
+                event.isGoldenKappaTrain
             );
         });
         this._subscriptions.push(hypeTrainProgressSubscription);
@@ -151,7 +226,8 @@ class TwitchEventSubClient {
                 event.startDate,
                 event.endDate,
                 event.cooldownEndDate,
-                event.topContributors
+                event.topContributors,
+                event.isGoldenKappaTrain
             );
         });
         this._subscriptions.push(hypeTrainEndSubscription);
@@ -287,15 +363,23 @@ class TwitchEventSubClient {
             if (event.endDate) {
                 const timeoutDuration = (event.endDate.getTime() - event.startDate.getTime()) / 1000;
                 twitchEventsHandler.viewerTimeout.triggerTimeout(
+                    event.userName,
+                    event.userId,
                     event.userDisplayName,
-                    timeoutDuration,
                     event.moderatorName,
+                    event.moderatorId,
+                    event.moderatorDisplayName,
+                    timeoutDuration,
                     event.reason
                 );
             } else {
                 twitchEventsHandler.viewerBanned.triggerBanned(
+                    event.userName,
+                    event.userId,
                     event.userDisplayName,
                     event.moderatorName,
+                    event.moderatorId,
+                    event.moderatorDisplayName,
                     event.reason
                 );
             }
@@ -308,7 +392,11 @@ class TwitchEventSubClient {
         const unbanSubscription = this._eventSubListener.onChannelUnban(streamer.userId, (event) => {
             twitchEventsHandler.viewerBanned.triggerUnbanned(
                 event.userName,
-                event.moderatorName
+                event.userId,
+                event.userDisplayName,
+                event.moderatorName,
+                event.moderatorId,
+                event.moderatorDisplayName
             );
         });
         this._subscriptions.push(unbanSubscription);
@@ -331,6 +419,8 @@ class TwitchEventSubClient {
         // Charity Donation
         const charityDonationSubscription = this._eventSubListener.onChannelCharityDonation(streamer.userId, (event) => {
             twitchEventsHandler.charity.triggerCharityDonation(
+                event.donorName,
+                event.donorId,
                 event.donorDisplayName,
                 event.charityName,
                 event.charityDescription,
@@ -418,15 +508,6 @@ class TwitchEventSubClient {
                         event.chatterDisplayName,
                         event.messageText,
                         event.newTier
-                    );
-                    break;
-
-                case "raid":
-                    twitchEventsHandler.raid.triggerRaid(
-                        event.raiderName,
-                        event.raiderId,
-                        event.raiderDisplayName,
-                        event.viewerCount
                     );
                     break;
 

@@ -5,6 +5,7 @@ const effectManager = require("./effectManager");
 exports.loadEffects = () => {
     [
         'active-user-lists',
+        'activity-feed-alert',
         'add-quote',
         'api',
         'block-unblock',
@@ -44,6 +45,7 @@ exports.loadEffects = () => {
         'reset-timer',
         'run-command',
         'run-program',
+        'send-custom-websocket-event',
         'sequential-effect',
         'set-user-metadata',
         'shoutout',
@@ -61,6 +63,7 @@ exports.loadEffects = () => {
         'update-channel-reward',
         'update-counter',
         'update-role',
+        'update-viewer-rank',
         'update-vip-role',
 
         'twitch/ad-break',
@@ -70,6 +73,7 @@ exports.loadEffects = () => {
         'twitch/raid',
         'twitch/set-chat-mode',
         'twitch/shoutout',
+        'twitch/snooze-ad-break',
         'twitch/stream-title',
         'twitch/stream-game',
 
@@ -80,7 +84,7 @@ exports.loadEffects = () => {
         'twitch/create-prediction',
         'twitch/lock-prediction',
         'twitch/resolve-prediction'
-    ].forEach(filename => {
+    ].forEach((filename) => {
         const definition = require(`./builtin/${filename}`);
         effectManager.registerEffect(definition);
     });

@@ -1,7 +1,7 @@
 import { BasicViewer, FirebotViewer } from "../../types/viewers";
 import logger from "../logwrapper";
 
-import { settings } from "../common/settings-access";
+import { SettingsManager } from "../common/settings-manager";
 import viewerDatabase from "./viewer-database";
 import chatRolesManager from "../roles/chat-roles-manager";
 import connectionManager from "../common/connection-manager";
@@ -100,12 +100,15 @@ class ViewerOnlineStatusManager {
                 lastSeen: now
             };
 
-            if (chatRolesManager.userIsKnownBot(viewer.username) && settings.getAutoFlagBots()) {
+            if (await chatRolesManager.userIsKnownBot(viewer.id) === true && SettingsManager.getSetting("AutoFlagBots")) {
                 dbData.disableAutoStatAccrual = true;
                 dbData.disableActiveUserList = true;
             }
 
             await viewerDatabase.getViewerDb().updateAsync({ _id: viewer.id }, { $set: dbData });
+
+            await viewerDatabase.calculateAutoRanks(viewer.id);
+
         } catch (error) {
             logger.error("Failed to set viewer to online", error);
         }
@@ -255,6 +258,8 @@ class ViewerOnlineStatusManager {
                 previousViewTime: previousHours,
                 newViewTime: newHours
             });
+
+            viewerDatabase.calculateAutoRanks(viewer._id, "view_time");
         }
     }
 }

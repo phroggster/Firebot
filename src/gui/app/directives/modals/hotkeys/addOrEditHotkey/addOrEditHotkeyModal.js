@@ -11,9 +11,7 @@
             modalInstance: "<"
         },
         controller: function(
-            $scope,
             hotkeyService,
-            utilityService,
             ngToast
         ) {
             const $ctrl = this;
@@ -38,23 +36,6 @@
             };
 
             $ctrl.$onInit = function() {
-                const modalId = $ctrl.resolve.modalId;
-                utilityService.addSlidingModal(
-                    $ctrl.modalInstance.rendered.then(() => {
-                        const modalElement = $(`.${modalId}`).children();
-                        return {
-                            element: modalElement,
-                            name: "Edit Hotkey",
-                            id: modalId,
-                            instance: $ctrl.modalInstance
-                        };
-                    })
-                );
-
-                $scope.$on("modal.closing", function() {
-                    utilityService.removeSlidingModal();
-                });
-
                 if ($ctrl.resolve.hotkey != null) {
                     $ctrl.hotkey = JSON.parse(JSON.stringify($ctrl.resolve.hotkey));
                 }

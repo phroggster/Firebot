@@ -2,13 +2,14 @@ import { DateTime } from "luxon";
 import axios from "axios";
 import logger from "../logwrapper";
 import accountAccess from "../common/account-access";
-import { settings } from "../common/settings-access";
+import { SettingsManager } from "../common/settings-manager";
 import frontendCommunicator from "../common/frontend-communicator";
 import TwitchApi from "./api";
 import {
     triggerCategoryChanged,
     triggerTitleChanged
 } from "../events/twitch-events/stream";
+import adManager from "./ad-manager";
 
 interface TwitchStreamInfo {
     isLive?: boolean;
@@ -40,6 +41,8 @@ class TwitchStreamInfoManager {
         if (this._streamInfoPollIntervalId != null) {
             clearTimeout(this._streamInfoPollIntervalId);
         }
+
+        adManager.stopAdCheck();
     }
 
     private async doWebCheckin(): Promise<void> {
@@ -71,6 +74,8 @@ class TwitchStreamInfoManager {
         if (stream == null) {
             if (this.streamInfo.isLive) {
                 streamInfoChanged = true;
+
+                adManager.stopAdCheck();
             }
             this.streamInfo.isLive = false;
         } else {
@@ -78,12 +83,17 @@ class TwitchStreamInfoManager {
                 this.streamInfo.viewers !== stream.viewers ||
                 this.streamInfo.startedAt !== stream.startDate) {
                 streamInfoChanged = true;
+
+                // We just went live, so start the ad check
+                if (!this.streamInfo.isLive) {
+                    await adManager.startAdCheck();
+                }
             }
             this.streamInfo.isLive = true;
             this.streamInfo.viewers = stream.viewers;
             this.streamInfo.startedAt = stream.startDate;
 
-            if (settings.getWebOnlineCheckin() === true) {
+            if (SettingsManager.getSetting("WebOnlineCheckin") === true) {
                 await this.doWebCheckin();
             }
 

@@ -1,12 +1,12 @@
 "use strict";
 const { ipcMain, shell } = require("electron");
-const uuid = require("uuid/v4");
+const { v4: uuid } = require("uuid");
 const logger = require("../../../logwrapper");
-const { settings } = require("../../settings-access");
 const utils = require("../../../utility");
 const profileManager = require("../../profile-manager");
-const { getScriptPath, buildRunRequest, mapParameters, mapV4EffectToV5 } = require("./custom-script-helpers");
+const { getScriptPath, buildRunRequest, mapParameters } = require("./custom-script-helpers");
 const effectRunner = require("../../effect-runner.js");
+import { SettingsManager } from "../../settings-manager";
 
 /**
  * @typedef { import('./script-types').ScriptData } ScriptData
@@ -36,7 +36,7 @@ async function executeScript(scriptData, trigger, isStartupScript = false) {
     let customScript;
     try {
         // Make sure we first remove the cached version, incase there was any changes
-        if (settings.getClearCustomScriptCache()) {
+        if (SettingsManager.getSetting("ClearCustomScriptCache")) {
             delete require.cache[require.resolve(scriptFilePath)];
         }
         customScript = require(scriptFilePath);
@@ -122,9 +122,8 @@ async function executeScript(scriptData, trigger, isStartupScript = false) {
         effectsObj = {
             id: uuid(),
             list: effects
-                .filter((e) => e.type != null && e.type !== "")
+                .filter(e => e.type != null && e.type !== "")
                 .map((e) => {
-                    e = mapV4EffectToV5(e);
                     if (e.id == null) {
                         e.id = uuid();
                     }
@@ -168,7 +167,7 @@ async function runStartUpScript(startUpScriptConfig) {
     const { scriptName } = startUpScriptConfig;
     logger.debug(`running startup script: ${scriptName}`);
 
-    if (!settings.isCustomScriptsEnabled()) {
+    if (SettingsManager.getSetting("RunCustomScripts") !== true) {
         logger.warn("Attempted to run startup script but custom scripts are disabled.");
         return;
     }
@@ -229,7 +228,7 @@ function runScript(effect, trigger) {
 
     logger.debug(`running script: ${scriptName}`);
 
-    if (!settings.isCustomScriptsEnabled()) {
+    if (SettingsManager.getSetting("RunCustomScripts")) {
         renderWindow.webContents.send(
             "error",
             "Something attempted to run a custom script but this feature is disabled!"
@@ -240,6 +239,20 @@ function runScript(effect, trigger) {
     return executeScript(effect, trigger);
 }
 
+async function stopAllScripts() {
+    logger.info("Stopping all custom scripts...");
+    for (const activeScript of Object.values(activeCustomScripts)) {
+        if (activeScript.stop != null) {
+            try {
+                await Promise.resolve(activeScript.stop());
+            } catch (error) {
+                logger.error(`Error when attempting to stop custom script`, error);
+            }
+        }
+    }
+    logger.info("Stopped all custom scripts");
+}
+
 ipcMain.on("openScriptsFolder", function () {
     shell.openPath(profileManager.getPathInProfile("/scripts"));
 });
@@ -248,3 +261,4 @@ exports.runScript = runScript;
 exports.runStartUpScript = runStartUpScript;
 exports.startUpScriptSaved = startUpScriptSaved;
 exports.startUpScriptDeleted = startUpScriptDeleted;
+exports.stopAllScripts = stopAllScripts;

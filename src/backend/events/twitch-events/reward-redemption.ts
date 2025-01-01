@@ -8,7 +8,7 @@ export function handleRewardRedemption(
     isQueued: boolean,
     messageText: string,
     userId: string,
-    userName: string,
+    username: string,
     userDisplayName: string,
     rewardId: string,
     rewardTitle: string,
@@ -23,7 +23,8 @@ export function handleRewardRedemption(
         messageText,
         user: {
             id: userId,
-            username: userName
+            username,
+            displayName: userDisplayName
         },
         reward: {
             id: rewardId,
@@ -35,10 +36,11 @@ export function handleRewardRedemption(
 
     setTimeout(() => {
         const redemptionMeta = {
-            username: userDisplayName,
-            userIdName: userName,
-            userId: userId,
+            username,
+            userId,
+            userDisplayName,
             messageText,
+            args: (messageText ?? "").split(" "),
             redemptionId,
             rewardId,
             rewardImage: rewardImageUrl,
@@ -50,4 +52,41 @@ export function handleRewardRedemption(
         rewardManager.triggerChannelReward(rewardId, redemptionMeta);
         eventManager.triggerEvent("twitch", "channel-reward-redemption", redemptionMeta);
     }, 100);
+}
+
+export function handleRewardUpdated(
+    redemptionId: string,
+    status: string,
+    messageText: string,
+    userId: string,
+    username: string,
+    userDisplayName: string,
+    rewardId: string,
+    rewardTitle: string,
+    rewardPrompt: string,
+    rewardCost: number,
+    rewardImageUrl: string
+): void {
+    const redemptionMeta = {
+        username,
+        userId,
+        userDisplayName,
+        messageText,
+        args: (messageText ?? "").split(" "),
+        redemptionId,
+        rewardId,
+        rewardImage: rewardImageUrl,
+        rewardName: rewardTitle,
+        rewardDescription: rewardPrompt,
+        rewardCost: rewardCost
+    };
+
+    // Possible values for status are 'fulfilled' and 'canceled' according to Twitch docs
+    if (status === 'fulfilled') {
+        rewardManager.triggerChannelRewardFulfilled(rewardId, redemptionMeta);
+        eventManager.triggerEvent("twitch", "channel-reward-redemption-fulfilled", redemptionMeta);
+    } else {
+        rewardManager.triggerChannelRewardCanceled(rewardId, redemptionMeta);
+        eventManager.triggerEvent("twitch", "channel-reward-redemption-canceled", redemptionMeta);
+    }
 }

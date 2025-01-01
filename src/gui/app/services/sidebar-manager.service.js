@@ -3,24 +3,30 @@
 (function() {
     angular
         .module("firebotApp")
-        .factory("sidebarManager", function($timeout, $rootScope, settingsService) {
+        .factory("sidebarManager", function($timeout, $rootScope, $location, $translate, settingsService, uiExtensionsService, backendCommunicator) {
             const service = {};
 
-            service.navExpanded = settingsService.getSidebarExpanded();
+            service.navExpanded = settingsService.getSetting("SidebarExpanded");
 
             service.toggleNav = function() {
                 service.navExpanded = !service.navExpanded;
                 $rootScope.$broadcast("navToggled");
-                settingsService.setSidebarExpanded(service.navExpanded);
+                settingsService.saveSetting("SidebarExpanded", service.navExpanded);
             };
 
             service.currentTab = "chat feed";
             service.currentTabName = "Dashboard";
 
-            service.setTab = function(tabId, name) {
+            service.fullPage = true;
+            service.disableScroll = true;
+
+            service.setTab = function(tabId, name, extensionId, extensionPageId) {
                 service.currentTab = tabId.toLowerCase();
 
                 service.currentTabName = name ? name : tabId;
+
+                service.fullPage = service.currentTabIsFullScreen(extensionId, extensionPageId);
+                service.disableScroll = service.currentTabShouldntScroll(extensionId, extensionPageId);
 
                 //hack that somewhat helps with the autoupdate slider styling issues on first load
                 $timeout(function() {
@@ -32,7 +38,12 @@
                 return service.currentTab.toLowerCase() === tabId.toLowerCase();
             };
 
-            service.currentTabIsFullScreen = function() {
+            service.currentTabIsFullScreen = function(extensionId, extensionPageId) {
+                const isExtensionPage = extensionId != null;
+                if (isExtensionPage) {
+                    const page = uiExtensionsService.getPage(extensionId, extensionPageId);
+                    return page?.fullPage ?? false;
+                }
                 return [
                     "chat feed",
                     "commands",
@@ -41,6 +52,7 @@
                     "events",
                     "timers",
                     "channel rewards",
+                    "roles and ranks",
                     "moderation",
                     "buttons",
                     "settings",
@@ -49,22 +61,94 @@
                     "effect queues",
                     "currency",
                     "quotes",
-                    "viewers"
+                    "viewers",
+                    "variable macros"
                 ].includes(service.currentTab.toLowerCase());
             };
 
-            service.currentTabShouldntScroll = function() {
+            service.currentTabShouldntScroll = function(extensionId, extensionPageId) {
+                const isExtensionPage = extensionId != null;
+                if (isExtensionPage) {
+                    const page = uiExtensionsService.getPage(extensionId, extensionPageId);
+                    return page?.disableScroll ?? false;
+                }
                 return [
                     "chat feed",
                     "commands",
-                    "preset effect lists",
                     "events",
                     "timers",
                     "channel rewards",
-                    "buttons",
+                    "roles and ranks",
+                    "preset effect lists",
+                    "variable macros",
+                    "counters",
+                    "effect queues",
                     "settings"
                 ].includes(service.currentTab.toLowerCase());
             };
+
+            backendCommunicator.on("navigate", (tabId) => {
+                switch (tabId) {
+                    case "dashboard":
+                        $translate("SIDEBAR.CHAT.CHAT_FEED").then((tabName) => {
+                            service.setTab("chat feed", tabName);
+                            $location.path("/chat-feed");
+                        });
+                        break;
+
+                    case "commands":
+                        $translate("SIDEBAR.CHAT.COMMANDS").then((tabName) => {
+                            service.setTab("commands", tabName);
+                            $location.path("/commands");
+                        });
+                        break;
+
+                    case "events":
+                        $translate("SIDEBAR.OTHER.EVENTS").then((tabName) => {
+                            service.setTab("events", tabName);
+                            $location.path("/events");
+                        });
+                        break;
+
+                    case "time-based":
+                        $translate("SIDEBAR.OTHER.TIME_BASED").then((tabName) => {
+                            service.setTab("timers", tabName);
+                            $location.path("/timers");
+                        });
+                        break;
+
+                    case "channel-rewards":
+                        $translate("SIDEBAR.OTHER.CHANNELREWARDS").then((tabName) => {
+                            service.setTab("channel rewards", tabName);
+                            $location.path("/channel-rewards");
+                        });
+                        break;
+
+                    case "preset-effect-lists":
+                        $translate("SIDEBAR.OTHER.PRESET_EFFECT_LISTS").then((tabName) => {
+                            service.setTab("preset effect lists", tabName);
+                            $location.path("/preset-effect-lists");
+                        });
+                        break;
+
+                    case "hotkeys":
+                        $translate("SIDEBAR.OTHER.HOTKEYS").then((tabName) => {
+                            service.setTab("hotkeys", tabName);
+                            $location.path("/hotkeys");
+                        });
+                        break;
+
+                    case "counters":
+                        $translate("SIDEBAR.OTHER.COUNTERS").then((tabName) => {
+                            service.setTab("counters", tabName);
+                            $location.path("/counters");
+                        });
+                        break;
+
+                    default:
+                        break;
+                }
+            });
 
             return service;
         });
@@ -76,9 +160,9 @@
         function($routeProvider) {
             $routeProvider
 
-                .when("/viewer-roles", {
-                    templateUrl: "./templates/_viewerroles.html",
-                    controller: "viewerRolesController"
+                .when("/roles-and-ranks", {
+                    templateUrl: "./templates/_roles-and-ranks.html",
+                    controller: "rolesAndRanksController"
                 })
 
                 .when("/", {
@@ -164,6 +248,16 @@
                 .when("/games", {
                     templateUrl: "./templates/_games.html",
                     controller: "gamesController"
+                })
+
+                .when("/variable-macros", {
+                    templateUrl: "./templates/_variable-macros.html",
+                    controller: "variableMacrosController"
+                })
+
+                .when("/extension/:extensionId/:pageId", {
+                    templateUrl: "./templates/_extension-page.html",
+                    controller: "extensionPageController"
                 });
         }
     ]);

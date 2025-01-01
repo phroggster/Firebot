@@ -16,12 +16,13 @@ export interface FirebotViewer {
     disableViewerList: boolean;
     metadata: Record<string, unknown>;
     currency: Record<string, number>;
+    ranks: Record<string, string>;
 }
 
 export interface BasicViewer {
     id: string;
     username: string;
-    twitchRoles?: string[];
     displayName?: string;
+    twitchRoles?: string[];
     profilePicUrl?: string;
 }

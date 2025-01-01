@@ -14,7 +14,7 @@
                     >
                         <firebot-button
                             text="Get Overlay Path"
-                            ng-click="settings.showOverlayInfoModal()"
+                            ng-click="showOverlayInfoModal()"
                         />
                     </firebot-setting>
 
@@ -24,16 +24,33 @@
                     >
                         <span
                             style="padding-right: 10px"
-                            ng-if="settings.useOverlayInstances()"
+                            ng-if="settings.getSetting('UseOverlayInstances')"
                         >
                             <a href ng-click="showEditOverlayInstancesModal()">Edit Instances</a>
                         </span>
                         <firebot-select
                             options="{ true: 'On', false: 'Off' }"
-                            ng-init="overlayInstances = settings.useOverlayInstances()"
+                            ng-init="overlayInstances = settings.getSetting('UseOverlayInstances')"
                             selected="overlayInstances"
-                            on-update="settings.setUseOverlayInstances(option === 'true')"
+                            on-update="settings.saveSetting('UseOverlayInstances', option === 'true')"
                             right-justify="true"
+                            aria-label="enable or disable Overlay Instances"
+                        />
+                    </firebot-setting>
+
+                    <firebot-setting
+                        name="Force Effects to Continue on Overlay Refresh"
+                        description="When refreshing an overlay or using the Clear Effects effect on it, this will force
+                        any Play Video or Play Sound effects currently playing on that overlay to continue to the next effect,
+                        even if they're set to wait."
+                    >
+                        <toggle-button
+                            toggle-model="settings.getSetting('ForceOverlayEffectsToContinueOnRefresh')"
+                            on-toggle="settings.saveSetting('ForceOverlayEffectsToContinueOnRefresh', !settings.getSetting('ForceOverlayEffectsToContinueOnRefresh'))"
+                            font-size="40"
+                            accessibility-label="(settings.getSetting('ForceOverlayEffectsToContinueOnRefresh') ? 'Enabled' : 'Disabled') + '
+                             When refreshing an overlay or using the Clear Effects effect on it, this will force any Play Video or Play
+                             Sound effects currently playing on that overlay to continue to the next effect, even if they\\'re set to wait.'"
                         />
                     </firebot-setting>
 
@@ -52,16 +69,20 @@
             controller: function($scope, settingsService, utilityService) {
                 $scope.settings = settingsService;
 
-                $scope.showFontManagementModal = function() {
-                    utilityService.showModal({
-                        component: "fontManagementModal",
-                        size: "sm"
-                    });
+                $scope.showOverlayInfoModal = function(overlayInstance) {
+                    utilityService.showOverlayInfoModal(overlayInstance);
                 };
 
                 $scope.showEditOverlayInstancesModal = function() {
                     utilityService.showModal({
                         component: "editOverlayInstancesModal"
+                    });
+                };
+
+                $scope.showFontManagementModal = function() {
+                    utilityService.showModal({
+                        component: "fontManagementModal",
+                        size: "sm"
                     });
                 };
             }

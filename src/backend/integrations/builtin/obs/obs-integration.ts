@@ -1,6 +1,4 @@
-import { initRemote } from "./obs-remote";
 import { TypedEmitter } from "tiny-typed-emitter";
-import eventManager from "../../../events/EventManager";
 import {
     Integration,
     IntegrationController,
@@ -8,12 +6,24 @@ import {
     IntegrationEvents
 } from "@crowbartools/firebot-custom-scripts-types";
 import { EventManager } from "@crowbartools/firebot-custom-scripts-types/types/modules/event-manager";
+
 import logger from "../../../logwrapper";
+import effectManager from "../../../effects/effectManager";
+import eventManager from "../../../events/EventManager";
+import eventFilterManager from "../../../events/filters/filter-manager";
+import replaceVariableManager from "../../../variables/replace-variable-manager";
+import frontendCommunicator from "../../../common/frontend-communicator";
+
+import { initRemote } from "./obs-remote";
+import { setupFrontendListeners } from "./communicator";
+
 import { ChangeSceneEffectType } from "./effects/change-scene-effect-type";
 import { ChangeSceneCollectionEffectType } from "./effects/change-scene-collection";
+import { CreateRecordChapter } from "./effects/create-recording-chapter";
 import { ToggleSourceVisibilityEffectType } from "./effects/toggle-obs-source-visibility";
 import { ToggleSourceFilterEffectType } from "./effects/toggle-obs-source-filter";
 import { ToggleSourceMutedEffectType } from "./effects/toggle-obs-source-muted";
+import { TransformSourceEffectType } from "./effects/transform-obs-source";
 import { StartStreamEffectType } from "./effects/start-stream";
 import { StopStreamEffectType } from "./effects/stop-stream";
 import { StartVirtualCamEffectType } from "./effects/start-virtual-cam";
@@ -26,10 +36,15 @@ import { SetOBSMediaSourceFileEffectType } from "./effects/set-obs-media-source-
 import { SetOBSColorSourceColorEffectType } from "./effects/set-obs-color-source-color";
 import { SendRawOBSWebSocketRequestEffectType } from "./effects/send-raw-obs-websocket-request";
 import { TakeOBSSourceScreenshotEffectType } from "./effects/take-obs-source-screenshot";
+
 import { OBSEventSource } from "./events/obs-event-source";
-import { SceneNameEventFilter } from "./filters/scene-name-filter";
+
+import GroupNameEventFilter from "./filters/group-name-filter";
+import SceneNameEventFilter from "./filters/scene-name-filter";
+
 import { SceneNameVariable } from "./variables/scene-name-variable";
 import { SceneCollectionNameVariable } from "./variables/scene-collection-name";
+import { IsConnectedVariable } from "./variables/is-connected";
 import { IsStreamingVariable } from "./variables/is-streaming";
 import { IsRecordingVariable } from "./variables/is-recording";
 import { ColorValueVariable } from "./variables/obs-color-value";
@@ -43,11 +58,22 @@ import { ProfileNameVariable } from "./variables/profile-name";
 import { VendorNameVariable } from "./variables/vendor-name";
 import { VendorEventTypeVariable } from "./variables/vendor-event-type";
 import { VendorEventDataVariable } from "./variables/vendor-event-data";
-import { setupFrontendListeners } from "./communicator";
-import effectManager from "../../../effects/effectManager";
-import eventFilterManager from "../../../events/filters/filter-manager";
-import replaceVariableManager from "../../../variables/replace-variable-manager";
-import frontendCommunicator from "../../../common/frontend-communicator";
+import { InputNameVariable } from "./variables/input-name";
+import { InputUuidVariable } from "./variables/input-uuid";
+import { InputKindVariable } from "./variables/input-kind";
+import { OldInputNameVariable } from "./variables/old-input-name";
+import { InputSettingsVariable } from "./variables/input-settings";
+import { InputActiveVariable } from "./variables/input-active";
+import { InputShowingVariable } from "./variables/input-showing";
+import { InputMutedVariable } from "./variables/input-muted";
+import { InputVolumeDbVariable } from "./variables/input-volume-db";
+import { InputVolumeMultiplierVariable } from "./variables/input-volume-multiplier";
+import { InputAudioBalanceVariable } from "./variables/input-audio-balance";
+import { InputAudioSyncOffsetVariable } from "./variables/input-audio-sync-offset";
+import { InputAudioTracksVariable } from "./variables/input-audio-tracks";
+import { InputAudioMonitorTypeVariable } from "./variables/input-audio-monitor-type";
+import { GroupItemIdVariable } from "./variables/group-item-id";
+import { GroupNameVariable } from "./variables/group-name";
 
 type ObsSettings = {
     websocketSettings: {
@@ -116,9 +142,11 @@ class ObsIntegration
 
         effectManager.registerEffect(ChangeSceneEffectType);
         effectManager.registerEffect(ChangeSceneCollectionEffectType);
+        effectManager.registerEffect(CreateRecordChapter);
         effectManager.registerEffect(ToggleSourceVisibilityEffectType);
         effectManager.registerEffect(ToggleSourceFilterEffectType);
         effectManager.registerEffect(ToggleSourceMutedEffectType);
+        effectManager.registerEffect(TransformSourceEffectType);
         effectManager.registerEffect(StartStreamEffectType);
         effectManager.registerEffect(StopStreamEffectType);
         effectManager.registerEffect(StartVirtualCamEffectType);
@@ -134,13 +162,17 @@ class ObsIntegration
 
         eventManager.registerEventSource(OBSEventSource);
 
+        eventFilterManager.registerFilter(GroupNameEventFilter);
         eventFilterManager.registerFilter(SceneNameEventFilter);
 
         replaceVariableManager.registerReplaceVariable(SceneNameVariable);
         replaceVariableManager.registerReplaceVariable(SceneCollectionNameVariable);
+        replaceVariableManager.registerReplaceVariable(IsConnectedVariable);
         replaceVariableManager.registerReplaceVariable(IsStreamingVariable);
         replaceVariableManager.registerReplaceVariable(IsRecordingVariable);
         replaceVariableManager.registerReplaceVariable(ColorValueVariable);
+        replaceVariableManager.registerReplaceVariable(GroupItemIdVariable);
+        replaceVariableManager.registerReplaceVariable(GroupNameVariable);
         replaceVariableManager.registerReplaceVariable(SceneItemIdVariable);
         replaceVariableManager.registerReplaceVariable(SceneItemNameVariable);
         replaceVariableManager.registerReplaceVariable(SceneItemEnabledVariable);
@@ -151,6 +183,20 @@ class ObsIntegration
         replaceVariableManager.registerReplaceVariable(VendorNameVariable);
         replaceVariableManager.registerReplaceVariable(VendorEventTypeVariable);
         replaceVariableManager.registerReplaceVariable(VendorEventDataVariable);
+        replaceVariableManager.registerReplaceVariable(InputNameVariable);
+        replaceVariableManager.registerReplaceVariable(InputUuidVariable);
+        replaceVariableManager.registerReplaceVariable(InputKindVariable);
+        replaceVariableManager.registerReplaceVariable(InputSettingsVariable);
+        replaceVariableManager.registerReplaceVariable(OldInputNameVariable);
+        replaceVariableManager.registerReplaceVariable(InputActiveVariable);
+        replaceVariableManager.registerReplaceVariable(InputShowingVariable);
+        replaceVariableManager.registerReplaceVariable(InputMutedVariable);
+        replaceVariableManager.registerReplaceVariable(InputVolumeDbVariable);
+        replaceVariableManager.registerReplaceVariable(InputVolumeMultiplierVariable);
+        replaceVariableManager.registerReplaceVariable(InputAudioBalanceVariable);
+        replaceVariableManager.registerReplaceVariable(InputAudioSyncOffsetVariable);
+        replaceVariableManager.registerReplaceVariable(InputAudioTracksVariable);
+        replaceVariableManager.registerReplaceVariable(InputAudioMonitorTypeVariable);
 
         this.setupConnection(integrationData.userSettings);
     }

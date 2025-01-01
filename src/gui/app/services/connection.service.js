@@ -5,11 +5,11 @@
 
     angular
         .module("firebotApp")
-        .factory("connectionService", function(listenerService, soundService, $rootScope, backendCommunicator,
+        .factory("connectionService", function(soundService, $rootScope, backendCommunicator,
             logger, accountAccess, settingsService, utilityService, integrationService) {
             const service = {};
 
-            backendCommunicator.on("accountUpdate", accounts => {
+            backendCommunicator.on("accountUpdate", (accounts) => {
                 service.accounts = accounts;
                 service.loadProfiles();
             });
@@ -79,6 +79,8 @@
                 if (!invalidAccounts.streamer && !invalidAccounts.bot) {
                     return;
                 }
+
+                service.disconnectFromService("chat");
 
                 if (invalidAccounts.streamer) {
                     service.logout("streamer");
@@ -154,7 +156,7 @@
                         const profileDb = dataAccess.getJsonDbInUserData(`./profiles/${profileId}/auth-twitch`);
                         streamer = profileDb.getData("/streamer");
                     } catch (err) {
-                        logger.info(`Couldn't get streamer data for profile ${profileId} while updating the UI. Its possible this account hasn't logged in yet.`);
+                        logger.info(`Couldn't get streamer data for profile ${profileId} while updating the UI. It's possible this account hasn't logged in yet.`);
                     }
 
                     if (streamer) {
@@ -199,7 +201,7 @@
             function updateSidebarServicesOverallStatus() {
                 let oneDisconnected = false;
                 let oneConnected = false;
-                const serviceIds = settingsService.getSidebarControlledServices();
+                const serviceIds = settingsService.getSetting("SidebarControlledServices");
                 for (const serviceId of serviceIds) {
 
                     if (serviceId == null || (serviceId !== "chat" && !serviceId.startsWith("integration."))) {
@@ -299,7 +301,7 @@
                 service.isConnectingAll = true;
             });
 
-            const playConnectionStatusSound = utilityService.debounce(connectionState => {
+            const playConnectionStatusSound = utilityService.debounce((connectionState) => {
                 const soundType = connectionState === ConnectionState.Connected ? "Online" : "Offline";
                 soundService.connectSound(soundType);
             }, 250);
@@ -360,24 +362,23 @@
 
             // Connection Monitor for Overlay
             // Recieves event from main process that connection has been established or disconnected.
-            const ListenerType = listenerService.ListenerType;
-            listenerService.registerListener(
-                { type: ListenerType.OVERLAY_CONNECTION_STATUS },
-                overlayStatusData => {
-                    let status;
-                    if (!overlayStatusData.serverStarted) {
-                        status = "disconnected";
-                    } else if (overlayStatusData.clientsConnected) {
-                        status = "connected";
-                    } else {
-                        status = "warning";
-                    }
-
-                    $rootScope.$broadcast("connection:update", {
-                        type: "overlay",
-                        status: status
-                    });
+            backendCommunicator.on("overlayStatusUpdate", (overlayStatusData) => {
+                let status;
+                if (!overlayStatusData.serverStarted) {
+                    status = "disconnected";
+                } else if (overlayStatusData.clientsConnected) {
+                    status = "connected";
+                } else {
+                    status = "warning";
                 }
+
+                service.connections["overlay"] = status;
+
+                $rootScope.$broadcast("connection:update", {
+                    type: "overlay",
+                    status: status
+                });
+            }
             );
 
             return service;

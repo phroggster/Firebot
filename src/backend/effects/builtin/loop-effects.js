@@ -3,7 +3,7 @@
 const effectRunner = require("../../common/effect-runner");
 const { EffectCategory } = require('../../../shared/effect-constants');
 const logger = require("../../logwrapper");
-const { settings } = require("../../common/settings-access");
+const { SettingsManager } = require("../../common/settings-manager");
 const conditionManager = require("./conditional-effects/conditions/condition-manager");
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -69,7 +69,7 @@ const model = {
    */
     optionsController: ($scope, settingsService) => {
 
-        $scope.whileLoopEnabled = settingsService.getWhileLoopEnabled();
+        $scope.whileLoopEnabled = settingsService.getSetting("WhileLoopEnabled");
 
         if ($scope.effect.effectList == null) {
             $scope.effect.effectList = [];
@@ -100,13 +100,18 @@ const model = {
             const { effect, trigger, outputs } = event;
             const effectList = effect.effectList;
 
+            /**
+             * @type {AbortSignal}
+             */
+            const abortSignal = event.abortSignal;
+
             let lastOutputs = outputs ?? {};
 
-            if (!effectList || !effectList.list) {
+            if (!effectList || !effectList.list || effectList.list.length === 0 || abortSignal.aborted) {
                 return resolve(true);
             }
 
-            if (effect.loopMode === 'conditional' && !settings.getWhileLoopEnabled()) {
+            if (effect.loopMode === 'conditional' && !SettingsManager.getSetting("WhileLoopEnabled")) {
                 return resolve(true);
             }
 
@@ -143,6 +148,9 @@ const model = {
                 }
 
                 for (let i = 0; i < loopCount; i++) {
+                    if (abortSignal.aborted) {
+                        return resolve(true);
+                    }
                     const result = await runEffects(i, null, lastOutputs);
                     lastOutputs = {
                         ...lastOutputs,
@@ -170,6 +178,9 @@ const model = {
                 }
 
                 while (true) { //eslint-disable-line no-constant-condition
+                    if (abortSignal.aborted) {
+                        return resolve(true);
+                    }
                     if (effect.conditionData == null || effectList == null) {
                         break;
                     }
@@ -226,6 +237,9 @@ const model = {
 
                 let currentLoopCount = 0;
                 for (const item of arrayToIterate) {
+                    if (abortSignal.aborted) {
+                        return resolve(true);
+                    }
                     const result = await runEffects(currentLoopCount, item, lastOutputs);
                     lastOutputs = {
                         ...lastOutputs,

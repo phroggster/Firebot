@@ -3,7 +3,7 @@ const { EventEmitter } = require("events");
 const util = require("../utility");
 const logger = require("../logwrapper");
 const frontendCommunicator = require("./frontend-communicator");
-const { settings } = require("./settings-access");
+const { SettingsManager } = require("./settings-manager");
 const twitchApi = require("../twitch-api/api");
 const twitchChat = require("../chat/twitch-chat");
 const twitchPubSubClient = require("../twitch-api/pubsub/pubsub-client");
@@ -54,14 +54,18 @@ function emitServiceConnectionUpdateEvents(serviceId, connectionState) {
 }
 
 // Chat listeners
-twitchChat.on("connected", () => emitServiceConnectionUpdateEvents("chat", ConnectionState.Connected));
+twitchChat.on("connected", () => {
+    emitServiceConnectionUpdateEvents("chat", ConnectionState.Connected);
+    const rewardsManager = require("../channel-rewards/channel-reward-manager");
+    rewardsManager.refreshChannelRewardRedemptions();
+});
 twitchChat.on("disconnected", () => emitServiceConnectionUpdateEvents("chat", ConnectionState.Disconnected));
 twitchChat.on("connecting", () => emitServiceConnectionUpdateEvents("chat", ConnectionState.Connecting));
 twitchChat.on("reconnecting", () => emitServiceConnectionUpdateEvents("chat", ConnectionState.Reconnecting));
 
 // Integrations listener
-integrationManager.on("integration-connected", (id) => emitServiceConnectionUpdateEvents(`integration.${id}`, ConnectionState.Connected));
-integrationManager.on("integration-disconnected", (id) => emitServiceConnectionUpdateEvents(`integration.${id}`, ConnectionState.Disconnected));
+integrationManager.on("integration-connected", id => emitServiceConnectionUpdateEvents(`integration.${id}`, ConnectionState.Connected));
+integrationManager.on("integration-disconnected", id => emitServiceConnectionUpdateEvents(`integration.${id}`, ConnectionState.Disconnected));
 
 let connectionUpdateInProgress = false;
 
@@ -153,8 +157,10 @@ class ConnectionManager extends EventEmitter {
         } else if (accountAccess.streamerTokenIssue()) {
             const botTokenIssue = accountAccess.getAccounts().bot.loggedIn && accountAccess.botTokenIssue();
 
-            const message = `There is an issue with the Streamer ${botTokenIssue ? ' and Bot' : ""} Twitch account${botTokenIssue ? 's' : ""}. Please re-sign into the account${botTokenIssue ? 's' : ""} and try again.`;
-            renderWindow.webContents.send("error", message);
+            frontendCommunicator.send("invalidate-accounts", {
+                streamer: true,
+                bot: botTokenIssue
+            });
         } else {
             const waitForServiceConnectDisconnect = (serviceId, action = true) => {
                 const shouldToggle = action === "toggle";
@@ -165,7 +171,7 @@ class ConnectionManager extends EventEmitter {
                     return Promise.resolve();
                 }
 
-                const promise = new Promise(resolve => {
+                const promise = new Promise((resolve) => {
                     currentlyWaitingService = {
                         serviceId: serviceId,
                         callback: () => resolve()
@@ -194,6 +200,7 @@ class ConnectionManager extends EventEmitter {
 
         currentlyWaitingService = null;
 
+        await util.wait(250);
         frontendCommunicator.send("connect-services-complete");
     }
 }
@@ -217,7 +224,7 @@ manager.on("service-connection-update", (data) => {
 });
 
 frontendCommunicator.onAsync("connect-sidebar-controlled-services", async () => {
-    const serviceIds = settings.getSidebarControlledServices();
+    const serviceIds = SettingsManager.getSetting("SidebarControlledServices");
 
     await manager.updateConnectionForServices(serviceIds.map(id => ({
         id,
@@ -226,7 +233,7 @@ frontendCommunicator.onAsync("connect-sidebar-controlled-services", async () => 
 });
 
 frontendCommunicator.on("disconnect-sidebar-controlled-services", () => {
-    const serviceIds = settings.getSidebarControlledServices();
+    const serviceIds = SettingsManager.getSetting("SidebarControlledServices");
     for (const id of serviceIds) {
         manager.updateServiceConnection(id, false);
     }

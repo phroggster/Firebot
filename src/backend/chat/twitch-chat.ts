@@ -86,8 +86,7 @@ class TwitchChat extends EventEmitter {
         }
 
         const streamerAuthProvider = firebotDeviceAuthProvider.streamerProvider;
-        const botAuthProvider = firebotDeviceAuthProvider.botProvider;
-        if (streamerAuthProvider == null && botAuthProvider == null) {
+        if (streamerAuthProvider == null && firebotDeviceAuthProvider.botProvider == null) {
             return;
         }
 
@@ -95,6 +94,9 @@ class TwitchChat extends EventEmitter {
         await this.disconnect(false);
 
         try {
+
+            await this.connectBotClient();
+
             this._streamerChatClient = new ChatClient({
                 authProvider: streamerAuthProvider,
                 requestMembershipEvents: true
@@ -134,34 +136,13 @@ class TwitchChat extends EventEmitter {
 
             chatterPoll.startChatterPoll();
 
-            const vips = await twitchApi.channels.getVips();
-            if (vips) {
-                chatRolesManager.loadUsersInVipRole(vips);
-            }
+            // Refresh these once we connect to Twitch
+            // While connected, we can just react to changes via chat messages/EventSub events
+            await chatRolesManager.loadVips();
+            await chatRolesManager.loadModerators();
         } catch (error) {
             logger.error("Chat connect error", error);
             await this.disconnect();
-        }
-
-        try {
-            const bot = accountAccess.getAccounts().bot;
-
-            if (bot.loggedIn) {
-                this._botChatClient = new ChatClient({
-                    authProvider: botAuthProvider,
-                    requestMembershipEvents: true
-                });
-
-                this._botChatClient.irc.onRegister(() => this._botChatClient.join(streamer.username));
-
-                twitchChatListeners.setupBotChatListeners(this._botChatClient);
-
-                this._botChatClient.connect();
-            } else {
-                this._botChatClient = null;
-            }
-        } catch (error) {
-            logger.error("Error joining streamers chat channel with Bot account", error);
         }
 
         try {
@@ -169,6 +150,46 @@ class TwitchChat extends EventEmitter {
         } catch (error) {
             logger.error("Error setting up chat listeners", error);
         }
+    }
+
+    private connectBotClient(): Promise<void> {
+        return new Promise((resolve) => {
+            let hasResolved = false;
+            const resolveIfNotResolved = () => {
+                if (!hasResolved) {
+                    hasResolved = true;
+                    resolve();
+                }
+            };
+            try {
+                const { streamer, bot } = accountAccess.getAccounts();
+
+                if (bot.loggedIn) {
+
+                    this._botChatClient = new ChatClient({
+                        authProvider: firebotDeviceAuthProvider.botProvider,
+                        requestMembershipEvents: true
+                    });
+
+                    this._botChatClient.onConnect(() => {
+                        resolveIfNotResolved();
+                    });
+
+                    this._botChatClient.irc.onRegister(() => this._botChatClient.join(streamer.username));
+
+                    twitchChatListeners.setupBotChatListeners(this._botChatClient);
+
+                    this._botChatClient.connect();
+
+                } else {
+                    this._botChatClient = null;
+                    resolveIfNotResolved();
+                }
+            } catch (error) {
+                logger.error("Error joining streamers chat channel with Bot account", error);
+                resolveIfNotResolved();
+            }
+        });
     }
 
     /**
@@ -245,9 +266,21 @@ class TwitchChat extends EventEmitter {
                 message,
                 accountType === "bot"
             );
-            if (slashCommandResult === true) {
-                return;
+            if (!slashCommandResult) {
+                global.renderWindow.webContents.send("chatUpdate", {
+                    fbEvent: "ChatAlert",
+                    message: `Failed to execute "${message}"`
+                });
             }
+            return;
+        }
+        if (slashCommandValidationResult != null &&
+            slashCommandValidationResult.success === false &&
+            slashCommandValidationResult.foundCommand !== false) {
+            global.renderWindow.webContents.send("chatUpdate", {
+                fbEvent: "ChatAlert",
+                message: slashCommandValidationResult.errorMessage
+            });
         }
 
         // split message into fragments that don't exceed the max message length
@@ -346,10 +379,14 @@ frontendCommunicator.onAsync("update-user-vip-status", async (data: UserVipReque
 
     if (shouldBeVip) {
         await twitchApi.moderation.addChannelVip(user.id);
-        chatRolesManager.addVipToVipList(username);
+        chatRolesManager.addVipToVipList({
+            id: user.id,
+            username: user.name,
+            displayName: user.displayName
+        });
     } else {
         await twitchApi.moderation.removeChannelVip(user.id);
-        chatRolesManager.removeVipFromVipList(username);
+        chatRolesManager.removeVipFromVipList(user.id);
     }
 });
 

@@ -174,7 +174,7 @@ async function moderateMessage(chatMessage) {
         return;
     }
 
-    const userExemptGlobally = rolesManager.userIsInRole(chatMessage.username, chatMessage.roles,
+    const userExemptGlobally = rolesManager.userIsInRole(chatMessage.userId, chatMessage.roles,
         chatModerationSettings.exemptRoles);
 
     if (userExemptGlobally) {
@@ -184,7 +184,7 @@ async function moderateMessage(chatMessage) {
     const twitchApi = require("../../twitch-api/api");
     const chat = require("../twitch-chat");
 
-    const userExemptForEmoteLimit = rolesManager.userIsInRole(chatMessage.username, chatMessage.roles, chatModerationSettings.emoteLimit.exemptRoles);
+    const userExemptForEmoteLimit = rolesManager.userIsInRole(chatMessage.userId, chatMessage.roles, chatModerationSettings.emoteLimit.exemptRoles);
     if (chatModerationSettings.emoteLimit.enabled && !!chatModerationSettings.emoteLimit.max && !userExemptForEmoteLimit) {
         const emoteCount = chatMessage.parts.filter(p => p.type === "emote").length;
         const emojiCount = chatMessage.parts
@@ -203,8 +203,13 @@ async function moderateMessage(chatMessage) {
         }
     }
 
-    const userExemptForUrlModeration = rolesManager.userIsInRole(chatMessage.username, chatMessage.roles, chatModerationSettings.urlModeration.exemptRoles);
-    if (chatModerationSettings.urlModeration.enabled && !userExemptForUrlModeration && !permitCommand.hasTemporaryPermission(chatMessage.username)) {
+    const userExemptForUrlModeration = rolesManager.userIsInRole(chatMessage.userId, chatMessage.roles, chatModerationSettings.urlModeration.exemptRoles);
+    if (
+        chatModerationSettings.urlModeration.enabled &&
+        !userExemptForUrlModeration &&
+        !permitCommand.hasTemporaryPermission(chatMessage.username) &&
+        !permitCommand.hasTemporaryPermission(chatMessage.userDisplayName.toLowerCase())
+    ) {
         let shouldDeleteMessage = false;
         const message = chatMessage.rawText;
         const regex = utils.getUrlRegex();
@@ -243,7 +248,7 @@ async function moderateMessage(chatMessage) {
                     const viewerDatabase = require('../../viewers/viewer-database');
                     const viewer = await viewerDatabase.getViewerByUsername(chatMessage.username);
 
-                    const viewerViewTime = viewer.minutesInChannel / 60;
+                    const viewerViewTime = viewer?.minutesInChannel ? viewer?.minutesInChannel / 60 : 0;
                     const minimumViewTime = settings.viewTime.viewTimeInHours;
 
                     if (viewerViewTime <= minimumViewTime) {
@@ -280,7 +285,7 @@ async function moderateMessage(chatMessage) {
             messageId: messageId,
             username: username,
             scanForBannedWords: chatModerationSettings.bannedWordList.enabled,
-            isExempt: rolesManager.userIsInRole(chatMessage.username, chatMessage.roles, chatModerationSettings.bannedWordList.exemptRoles),
+            isExempt: rolesManager.userIsInRole(chatMessage.userId, chatMessage.roles, chatModerationSettings.bannedWordList.exemptRoles),
             maxEmotes: null
         }
     );

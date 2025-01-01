@@ -64,9 +64,7 @@ const model: EffectType<{
             sortable: true,
             showIndex: true,
             indexZeroBased: true,
-            indexTemplate: "parameters[{index}]",
-            trigger: $scope.trigger,
-            triggerMeta: $scope.triggerMeta
+            indexTemplate: "parameters[{index}]"
         };
 
         $scope.codemirrorLoaded = function(_editor) {
@@ -89,7 +87,7 @@ const model: EffectType<{
     },
     onTriggerEvent: async ({ effect, trigger }) => {
         try {
-            const result = await evalSandboxedJs(effect.code, effect.parameters ?? [], trigger.metadata);
+            const result = await evalSandboxedJs(effect.code, effect.parameters ?? [], trigger);
             return {
                 success: true,
                 outputs: {

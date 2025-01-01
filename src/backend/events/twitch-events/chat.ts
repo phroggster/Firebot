@@ -1,25 +1,27 @@
 import { FirebotChatMessage } from "../../../types/chat";
 import frontendCommunicator from "../../common/frontend-communicator";
-import eventManager from "../EventManager";
+import eventManager from "../../events/EventManager";
 
 export function triggerChatMessage(firebotChatMessage: FirebotChatMessage): void {
     eventManager.triggerEvent("twitch", "chat-message", {
-        userId: firebotChatMessage.userId,
-        userIdName: firebotChatMessage.userIdName,
         username: firebotChatMessage.username,
+        userId: firebotChatMessage.userId,
+        userDisplayName: firebotChatMessage.userDisplayName,
         twitchUserRoles: firebotChatMessage.roles,
         messageText: firebotChatMessage.rawText,
+        messageId: firebotChatMessage.id,
         chatMessage: firebotChatMessage
     });
 }
 
 export function triggerFirstTimeChat(firebotChatMessage: FirebotChatMessage): void {
     eventManager.triggerEvent("twitch", "first-time-chat", {
-        userId: firebotChatMessage.userId,
-        userIdName: firebotChatMessage.userIdName,
         username: firebotChatMessage.username,
+        userId: firebotChatMessage.userId,
+        userDisplayName: firebotChatMessage.userDisplayName,
         twitchUserRoles: firebotChatMessage.roles,
         messageText: firebotChatMessage.rawText,
+        messageId: firebotChatMessage.id,
         chatMessage: firebotChatMessage
     });
 }

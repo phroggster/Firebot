@@ -15,18 +15,24 @@
                     <div class="pl-8"" style="flex-basis: 30%;">
                         {{$ctrl.subcommand.regex || $ctrl.subcommand.fallback ? ($ctrl.subcommand.usage || "").split(" ")[0] : $ctrl.subcommand.arg}}
                         <span ng-show="$ctrl.fullyEditable">
-                            <i ng-if="$ctrl.subcommandTypeTitle === 'Number'" class="far fa-hashtag muted text-lg" uib-tooltip="Number subcommand"></i>
-                            <i ng-if="$ctrl.subcommandTypeTitle === 'Username'" class="far fa-at muted text-lg" uib-tooltip="Username subcommand"></i>
+                            <i ng-if="$ctrl.subcommandTypeTitle() === 'Number'" class="far fa-hashtag muted text-lg" uib-tooltip="Number subcommand"></i>
+                            <i ng-if="$ctrl.subcommandTypeTitle() === 'Username'" class="far fa-at muted text-lg" uib-tooltip="Username subcommand"></i>
                         </span>
                     </div>
 
                     <div style="width: 25%">
-                        <span style="min-width: 51px; display: inline-block;" uib-tooltip="Global cooldown">
-                            <i class="fal fa-globe"></i> {{$ctrl.subcommand.cooldown.global ? $ctrl.subcommand.cooldown.global + "s" : "-" }}
-                        </span>
-                        <span uib-tooltip="User cooldown">
-                            <i class="fal fa-user"></i> {{$ctrl.subcommand.cooldown.user ? $ctrl.subcommand.cooldown.user + "s" : "-" }}
-                        </span>
+                        <div ng-if="!$ctrl.subcommand.inheritBaseCommandCooldown">
+                            <span style="min-width: 51px; display: inline-block;" uib-tooltip="Global cooldown">
+                                <i class="fal fa-globe"></i> {{$ctrl.subcommand.cooldown.global ? $ctrl.subcommand.cooldown.global + "s" : "-" }}
+                            </span>
+                            <span uib-tooltip="User cooldown">
+                                <i class="fal fa-user"></i> {{$ctrl.subcommand.cooldown.user ? $ctrl.subcommand.cooldown.user + "s" : "-" }}
+                            </span>
+                        </div>
+                        <div ng-if="$ctrl.subcommand.inheritBaseCommandCooldown">
+                            <span style="text-transform: capitalize;">Inherited</span>
+                            <tooltip type="info" text="'This subcommand will use the cooldowns of the base command.'"></tooltip>
+                        </div>
                     </div>
 
                     <div style="width: 25%">
@@ -95,7 +101,22 @@
                             <div class="settings-title">
                                 <h4 class="font-semibold">Cooldowns</h4>
                             </div>
-                            <command-cooldown-settings command="$ctrl.subcommand" message-setting-disabled="true"></command-cooldown-settings>
+                            <firebot-checkbox
+                                model="$ctrl.subcommand.inheritBaseCommandCooldown"
+                                label="Inherit base command cooldowns"
+                                tooltip="If enabled, this subcommand will use the cooldowns set on the base command."
+                            />
+                            <command-cooldown-settings
+                                ng-if="!$ctrl.subcommand.inheritBaseCommandCooldown"
+                                command="$ctrl.subcommand"
+                                message-setting-disabled="true"
+                            />
+                            <command-cooldown-settings
+                                ng-if="$ctrl.subcommand.inheritBaseCommandCooldown"
+                                disabled="true"
+                                command="{ cooldown: {}}"
+                                message-setting-disabled="true"
+                            />
                         </div>
 
                         <div class="mt-10">
@@ -143,6 +164,7 @@
                                 header="What should this subcommand do?"
                                 effects="$ctrl.subcommand.effects"
                                 trigger="command"
+                                trigger-meta="{ rootEffects: $ctrl.subcommand.effects }"
                                 update="$ctrl.effectListUpdated(effects)"
                                 is-array="true"
                             ></effect-list>
@@ -160,10 +182,24 @@
                 </div>
             </div>
         `,
-        controller: function(viewerRolesService, utilityService) {
+        controller: function(viewerRolesService) {
             const $ctrl = this;
 
-            $ctrl.subcommandTypeTitle = "";
+            $ctrl.subcommandTypeTitle = () => {
+                if ($ctrl.fullyEditable) {
+                    if (!$ctrl.subcommand.regex) {
+                        return "Custom";
+                    } else if ($ctrl.subcommand.fallback) {
+                        return "Fallback";
+                    } else if ($ctrl.subcommand.arg === '\\d+') {
+                        return "Number";
+                    } else if ($ctrl.subcommand.arg === '@\\w+') {
+                        return "Username";
+                    }
+                }
+
+                return "";
+            };
 
             $ctrl.compiledUsage = "";
             $ctrl.onUsageChange = () => {
@@ -174,6 +210,8 @@
             $ctrl.onMinArgsChange = () => {
                 if ($ctrl.adjustedMinArgs > 0) {
                     $ctrl.subcommand.minArgs = $ctrl.adjustedMinArgs + 1;
+                } else {
+                    $ctrl.subcommand.minArgs = 1;
                 }
             };
 
@@ -185,33 +223,11 @@
                     if ($ctrl.subcommand.minArgs > 0) {
                         $ctrl.adjustedMinArgs = $ctrl.subcommand.minArgs - 1;
                     }
-
-                    if ($ctrl.fullyEditable) {
-                        if (!$ctrl.subcommand.regex) {
-                            $ctrl.subcommandTypeTitle = "Custom";
-                        } else if ($ctrl.subcommand.fallback) {
-                            $ctrl.subcommandTypeTitle = "Fallback";
-                        } else if ($ctrl.subcommand.arg === '\\d+') {
-                            $ctrl.subcommandTypeTitle = "Number";
-                        } else if ($ctrl.subcommand.arg === '@\\w+') {
-                            $ctrl.subcommandTypeTitle = "Username";
-                        }
-                        console.log($ctrl.subcommand.arg);
-                    }
                 }
             };
 
             $ctrl.delete = () => {
-                utilityService.showConfirmationModal({
-                    title: "Delete Subcommand",
-                    question: `Are you sure you want to delete this subcommand?`,
-                    confirmLabel: "Delete",
-                    confirmBtnType: "btn-danger"
-                }).then(confirmed => {
-                    if (confirmed) {
-                        $ctrl.onDelete({ id: $ctrl.subcommand.id });
-                    }
-                });
+                $ctrl.onDelete({ id: $ctrl.subcommand.id });
             };
 
             $ctrl.edit = () => {

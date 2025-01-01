@@ -5,11 +5,11 @@
     angular
         .module("firebotApp")
         .controller("eventsController", function($scope, eventsService, utilityService,
-            listenerService, objectCopyHelper) {
+            backendCommunicator, objectCopyHelper) {
 
             $scope.es = eventsService;
 
-            const sources = listenerService.fireEventSync("getAllEventSources");
+            const sources = backendCommunicator.fireEventSync("getAllEventSources");
 
             function friendlyEventTypeName(sourceId, eventId) {
                 const source = sources.find(s => s.id === sourceId);
@@ -29,6 +29,8 @@
                     headerStyles: {
                         'min-width': '150px'
                     },
+                    dataField: "name",
+                    sortable: true,
                     cellTemplate: `{{data.name}}`,
                     cellController: () => {}
                 },
@@ -38,6 +40,8 @@
                     headerStyles: {
                         'min-width': '100px'
                     },
+                    dataField: "eventId",
+                    sortable: true,
                     cellTemplate: `{{data.eventId && data.sourceId ?
                         friendlyEventTypeName(data.sourceId, data.eventId) : "No
                         Type"}}`,
@@ -99,7 +103,7 @@
                         label: "New Event Set Name",
                         saveText: "Create",
                         validationFn: (value) => {
-                            return new Promise(resolve => {
+                            return new Promise((resolve) => {
                                 if (value == null || value.trim().length < 1) {
                                     resolve(false);
                                 } else {
@@ -122,7 +126,7 @@
                         label: "Rename Event Set",
                         saveText: "Save",
                         validationFn: (value) => {
-                            return new Promise(resolve => {
+                            return new Promise((resolve) => {
                                 if (value == null || value.trim().length < 1) {
                                     resolve(false);
                                 } else {
@@ -147,7 +151,7 @@
                         confirmLabel: "Delete",
                         confirmBtnType: "btn-danger"
                     })
-                    .then(confirmed => {
+                    .then((confirmed) => {
                         if (confirmed) {
                             eventsService.deleteGroup(group.id);
                         }
@@ -166,11 +170,12 @@
 
                 utilityService.showModal({
                     component: "addOrEditEventModal",
+                    breadcrumbName: "Edit Event",
                     resolveObj: {
                         event: () => event,
                         groupId: () => selectedGroupId
                     },
-                    closeCallback: resp => {
+                    closeCallback: (resp) => {
                         const { action, event, groupId } = resp;
 
                         switch (action) {
@@ -203,7 +208,7 @@
                         confirmLabel: "Delete",
                         confirmBtnType: "btn-danger"
                     })
-                    .then(confirmed => {
+                    .then((confirmed) => {
                         if (confirmed) {
                             const groupId = eventsService.getSelectedTab();
                             deleteEvent(groupId, eventId);
@@ -360,7 +365,7 @@
                     },
                     {
                         text: "Move to...",
-                        children: availableGroups.map(g => {
+                        children: availableGroups.map((g) => {
                             return {
                                 html: `<a href>${g.name}</a>`,
                                 click: () => {

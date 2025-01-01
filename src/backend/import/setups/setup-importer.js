@@ -5,14 +5,18 @@ const profileManager = require("../../common/profile-manager");
 const frontendCommunicator = require("../../common/frontend-communicator");
 
 const commandManager = require("../../chat/commands/command-manager");
-const countersManager = require("../../counters/counter-manager");
+const { CounterManager } = require("../../counters/counter-manager");
 const effectQueueManager = require("../../effects/queues/effect-queue-manager");
 const eventsAccess = require("../../events/events-access");
 const timerManager = require("../../timers/timer-manager");
+const scheduledTaskManager = require("../../timers/scheduled-task-manager");
 const presetEffectListManager = require("../../effects/preset-lists/preset-effect-list-manager");
 const customRolesManager = require("../../roles/custom-roles-manager");
 const quickActionManager = require("../../quick-actions/quick-action-manager");
+const variableMacroManager = require("../../variables/macro-manager");
+const rankManager = require("../../ranks/rank-manager");
 const { escapeRegExp } = require("../../utility");
+const currencyAccess = require("../../currency/currency-access").default;
 
 function findAndReplaceCurrency(data, currency) {
     const entries = Object.entries(data);
@@ -95,14 +99,14 @@ async function importSetup(setup, selectedCurrency) {
     // counters
     const counters = setup.components.counters || [];
     for (const counter of counters) {
-        await countersManager.saveItem(counter);
+        CounterManager.saveItem(counter);
     }
-    countersManager.triggerUiRefresh();
+    CounterManager.triggerUiRefresh();
 
     // currencies
     const currencies = setup.components.currencies || [];
     for (const currency of currencies) {
-        frontendCommunicator.send("import-currency", currency);
+        currencyAccess.importCurrency(currency);
     }
 
     // effect queues
@@ -163,12 +167,33 @@ async function importSetup(setup, selectedCurrency) {
     }
     timerManager.triggerUiRefresh();
 
+    // scheduled tasks
+    const scheduledTasks = setup.components.scheduledTasks || [];
+    for (const scheduledTask of scheduledTasks) {
+        scheduledTaskManager.saveScheduledTask(scheduledTask);
+    }
+    scheduledTaskManager.triggerUiRefresh();
+
+    // variable macros
+    const variableMacros = setup.components.variableMacros || [];
+    for (const macro of variableMacros) {
+        variableMacroManager.saveItem(macro);
+    }
+    variableMacroManager.triggerUiRefresh();
+
     // viewer roles
     const roles = setup.components.viewerRoles || [];
     for (const role of roles) {
-        customRolesManager.saveCustomRole(role);
+        await customRolesManager.importCustomRole(role);
     }
     customRolesManager.triggerUiRefresh();
+
+    // viewer rank ladders
+    const rankLadders = setup.components.viewerRankLadders || [];
+    for (const rankLadder of rankLadders) {
+        rankManager.saveItem(rankLadder);
+    }
+    rankManager.triggerUiRefresh();
 
     // quick actions
     const quickActions = setup.components.quickActions || [];
@@ -185,16 +210,16 @@ async function importSetup(setup, selectedCurrency) {
 function removeSetupComponents(components) {
     Object.entries(components)
         .forEach(([componentType, componentList]) => {
-            componentList.forEach(({id, name}) => {
+            componentList.forEach((id) => {
                 switch (componentType) {
                     case "commands":
                         commandManager.deleteCustomCommand(id);
                         break;
                     case "counters":
-                        countersManager.deleteItem(id);
+                        CounterManager.deleteItem(id);
                         break;
                     case "currencies":
-                        frontendCommunicator.send("remove-currency", { id, name });
+                        currencyAccess.deleteCurrency(id);
                         break;
                     case "effectQueues":
                         effectQueueManager.deleteItem(id);
@@ -214,8 +239,17 @@ function removeSetupComponents(components) {
                     case "timers":
                         timerManager.deleteItem(id);
                         break;
+                    case "scheduledTasks":
+                        scheduledTaskManager.deleteScheduledTask(id);
+                        break;
+                    case "variableMacros":
+                        variableMacroManager.deleteItem(id);
+                        break;
                     case "viewerRoles":
                         customRolesManager.deleteCustomRole(id);
+                        break;
+                    case "viewerRankLadders":
+                        rankManager.deleteItem(id);
                         break;
                     case "quickActions":
                         quickActionManager.deleteQuickAction(id);
@@ -227,7 +261,7 @@ function removeSetupComponents(components) {
             if (componentType === "commands") {
                 commandManager.triggerUiRefresh();
             } else if (componentType === "counters") {
-                countersManager.triggerUiRefresh();
+                CounterManager.triggerUiRefresh();
             } else if (componentType === "effectQueues") {
                 effectQueueManager.triggerUiRefresh();
             } else if (componentType === "events") {
@@ -238,8 +272,14 @@ function removeSetupComponents(components) {
                 presetEffectListManager.triggerUiRefresh();
             } else if (componentType === "timers") {
                 timerManager.triggerUiRefresh();
+            } else if (componentType === "scheduledTasks") {
+                scheduledTaskManager.triggerUiRefresh();
+            } else if (componentType === "variableMacros") {
+                variableMacroManager.triggerUiRefresh();
             } else if (componentType === "viewerRoles") {
                 customRolesManager.triggerUiRefresh();
+            } else if (componentType === "viewerRankLadders") {
+                rankManager.triggerUiRefresh();
             } else if (componentType === "quickActions") {
                 quickActionManager.triggerUiRefresh();
             }

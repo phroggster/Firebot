@@ -1,7 +1,7 @@
 "use strict";
 const app = require('electron').app;
 const moment = require("moment");
-const uuid = require("uuid/v4");
+const { v4: uuid } = require("uuid");
 const frontendCommunicator = require("../common/frontend-communicator");
 const rewardManager = require("../channel-rewards/channel-reward-manager");
 
@@ -12,7 +12,7 @@ const timeFormat = isUSLocale ? "h:mm" : "H:mm";
 
 const previousActivity = [];
 
-function handleTriggeredEvent(source, event, metadata) {
+export function handleTriggeredEvent(source, event, metadata, eventSettings = { forceAllow: false, canRetrigger: true }) {
     if (source == null || event == null || metadata == null) {
         return;
     }
@@ -44,7 +44,8 @@ function handleTriggeredEvent(source, event, metadata) {
         },
         event: {
             id: event.id,
-            name: event.name
+            name: event.name,
+            ...eventSettings
         },
         message: event.activityFeed.getMessage(metadata),
         icon: event.activityFeed.icon,
@@ -73,7 +74,9 @@ frontendCommunicator.on("retrigger-event", (activityId) => {
     }
 
     if (activity.eventId === "channel-reward-redemption") {
-        rewardManager.triggerChannelReward(activity.metadata.rewardId, activity.metadata);
+        // Manually triggered by streamer, must pass in userId and userDisplayName can be falsy
+        const metadata = {userId: "", userDisplayName: "", ...activity.metadata };
+        rewardManager.triggerChannelReward(activity.metadata.rewardId, metadata);
     }
 
     eventManager.triggerEvent(activity.sourceId, activity.eventId,
@@ -99,9 +102,3 @@ frontendCommunicator.onAsync("get-activity-feed-supported-events", async () => {
         .flat()
         .filter(e => e != null);
 });
-
-
-
-
-
-

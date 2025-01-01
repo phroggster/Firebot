@@ -2,7 +2,7 @@
 
 (function() {
 
-    const uuid = require("uuid/v1");
+    const { v4: uuid } = require("uuid");
 
     angular
         .module("firebotApp")
@@ -34,7 +34,7 @@
                         });
                 }
 
-                return copiedEffects
+                return JSON.parse(angular.toJson(copiedEffects))
                     .filter(e => !effectDefs || effectDefs.find(ed => ed.id === e.type))
                     .map(e => {
                         e.id = uuid();

@@ -2,7 +2,7 @@
 
 (function() {
 
-    const marked = require("marked");
+    const { marked } = require("marked");
     const { sanitize } = require("dompurify");
 
     angular
@@ -23,8 +23,8 @@
                     service.allActivities.length = 500;
                 }
 
-                const allowedEvents = settingsService.getAllowedActivityEvents();
-                if (!allowedEvents.includes(`${activity.source.id}:${activity.event.id}`)) {
+                const allowedEvents = settingsService.getSetting("AllowedActivityEvents");
+                if (!activity.event.forceAllow && !allowedEvents.includes(`${activity.source.id}:${activity.event.id}`)) {
                     return;
                 }
 
@@ -42,13 +42,13 @@
             };
 
             service.markAllAcknowledged = () => {
-                service.allActivities.forEach(a => {
+                service.allActivities.forEach((a) => {
                     a.acknowledged = true;
                 });
             };
 
             service.markAllNotAcknowledged = () => {
-                service.allActivities.forEach(a => {
+                service.allActivities.forEach((a) => {
                     a.acknowledged = false;
                 });
             };
@@ -83,7 +83,7 @@
                     component: "editActivityEventsModal",
                     size: "sm",
                     closeCallback: () => {
-                        const allowedEvents = settingsService.getAllowedActivityEvents();
+                        const allowedEvents = settingsService.getSetting("AllowedActivityEvents");
                         service.activities = service.allActivities
                             .filter(a => allowedEvents.includes(`${a.source.id}:${a.event.id}`));
                     }

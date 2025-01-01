@@ -3,8 +3,8 @@ const logger = require("../../logwrapper");
 const accountAccess = require("../../common/account-access");
 const frontendCommunicator = require("../../common/frontend-communicator");
 const firebotDeviceAuthProvider = require("../../auth/firebot-device-auth-provider");
-const chatRolesManager = require("../../roles/chat-roles-manager");
 const { PubSubClient } = require("@twurple/pubsub");
+const chatCommandHandler = require("../../chat/commands/chat-command-handler");
 
 /**@type {PubSubClient} */
 let pubSubClient;
@@ -87,46 +87,6 @@ async function createClient() {
         });
         listeners.push(autoModListener);
 
-        const modListener = pubSubClient.onModAction(streamer.userId, streamer.userId, (message) => {
-            const frontendCommunicator = require("../../common/frontend-communicator");
-
-            switch (message.type) {
-                case "vip_added":
-                    chatRolesManager.addVipToVipList(message.targetUserName);
-                    break;
-                case "vip_removed":
-                    chatRolesManager.removeVipFromVipList(message.targetUserName);
-                    break;
-                default:
-                    switch (message.action) {
-                        case "clear":
-                            twitchEventsHandler.chat.triggerChatCleared(message.userName, null, null);
-                            break;
-                        case "emoteonly":
-                        case "emoteonlyoff":
-                        case "subscribers":
-                        case "subscribersoff":
-                        case "followers":
-                        case "followersoff":
-                        case "slow":
-                        case "slowoff":
-                        case "r9kbeta": // Unique Chat
-                        case "r9kbetaoff":
-                            twitchEventsHandler.chat.triggerChatModeChanged(
-                                message.action,
-                                message.action.includes("off") ? "disabled" : "enabled",
-                                message.userName,
-                                message.args ? parseInt(message.args[0]) : null
-                            );
-                            break;
-                        default:
-                            return;
-                    }
-                    break;
-            }
-        });
-        listeners.push(modListener);
-
         const chatRoomListener = pubSubClient.onCustomTopic(streamer.userId, "stream-chat-room-v1", async (event) => {
             const message = event?.data;
             if (message?.type === "extension_message") {
@@ -144,6 +104,8 @@ async function createClient() {
                 );
 
                 frontendCommunicator.send("twitch:chat:message", firebotChatMessage);
+                chatCommandHandler.handleChatMessage(firebotChatMessage);
+                twitchEventsHandler.chatMessage.triggerChatMessage(firebotChatMessage);
             }
         });
         listeners.push(chatRoomListener);

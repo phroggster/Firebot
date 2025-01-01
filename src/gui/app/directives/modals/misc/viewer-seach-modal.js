@@ -18,12 +18,12 @@
 
                             <ui-select ng-model="$ctrl.model" theme="bootstrap" spinner-enabled="true" on-select="$ctrl.viewerSelected()">
                                 <ui-select-match placeholder="{{$ctrl.inputPlaceholder}}">
-                                    <span>{{$select.selected.username}}</span>
+                                    <div>{{$select.selected.displayName}}<span ng-if="$select.selected.displayName.toLowerCase() !== $select.selected.username.toLowerCase()" class="muted" style="vertical-align: bottom;">&nbsp;({{$select.selected.username}})</span></div>
                                 </ui-select-match>
                                 <ui-select-choices minimum-input-length="1" repeat="channel in $ctrl.channels | filter: $select.search" refresh="$ctrl.searchForChannels($select.search)" refresh-delay="400" style="position:relative;">
                                     <div style="height: 35px; display:flex; flex-direction: row; align-items: center;">
                                         <img style="height: 30px; width: 30px; border-radius: 5px; margin-right:10px;" ng-src="{{channel.avatarUrl || $ctrl.defaultAvatar}}">
-                                        <div style="font-weight: 100;font-size: 17px;">{{channel.username}}</div>
+                                        <div style="font-weight: 100;font-size: 17px;">{{channel.displayName}}<span ng-if="channel.displayName.toLowerCase() !== channel.username.toLowerCase()" class="muted"> ({{channel.username}})</span></div>
                                     </div>
                                 </ui-select-choices>
                             </ui-select>
@@ -60,7 +60,6 @@
                     if (query == null || query.trim() === "") {
                         return;
                     }
-                    console.log("searching");
                     backendCommunicator.fireEventAsync("search-twitch-channels", query)
                         .then(channels => {
                             console.log(channels);
@@ -94,23 +93,6 @@
                     if ($ctrl.resolve.validationText) {
                         $ctrl.validationText = $ctrl.resolve.validationText;
                     }
-
-                    const modalId = $ctrl.resolve.modalId;
-                    utilityService.addSlidingModal(
-                        $ctrl.modalInstance.rendered.then(() => {
-                            const modalElement = $(`.${modalId}`).children();
-                            return {
-                                element: modalElement,
-                                name: "Viewer Search",
-                                id: modalId,
-                                instance: $ctrl.modalInstance
-                            };
-                        })
-                    );
-
-                    $scope.$on("modal.closing", function() {
-                        utilityService.removeSlidingModal();
-                    });
                 };
 
                 $ctrl.save = function() {
