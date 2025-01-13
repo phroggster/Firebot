@@ -1,24 +1,38 @@
-"use strict";
+import util from "../../../utility";
+import twitchChat from "../../../chat/twitch-chat";
+import twitchListeners from "../../../chat/chat-listeners/twitch-chat-listeners";
+import commandManager from "../../../chat/commands/command-manager";
+import gameManager from "../../game-manager";
+import currencyAccess from "../../../currency/currency-access";
+import currencyManager from "../../../currency/currency-manager";
+import customRolesManager from "../../../roles/custom-roles-manager";
+import teamRolesManager from "../../../roles/team-roles-manager";
+import twitchRolesManager from "../../../../shared/twitch-roles";
+import { FirebotChatMessage } from "../../../../types/chat";
+import { SystemCommand } from "../../../../types/commands";
+import { GameSettings } from "../../../../types/game-manager";
+import logger from "../../../logwrapper";
+import triviaHelper from "./trivia-helper";
+import { TriviaSettings } from "./trivia-settings";
+import moment from "moment";
+import NodeCache from "node-cache";
 
-const util = require("../../../utility");
-const twitchChat = require("../../../chat/twitch-chat");
-const twitchListeners = require("../../../chat/chat-listeners/twitch-chat-listeners");
-const commandManager = require("../../../chat/commands/command-manager");
-const gameManager = require("../../game-manager");
-const currencyAccess = require("../../../currency/currency-access").default;
-const currencyManager = require("../../../currency/currency-manager");
-const customRolesManager = require("../../../roles/custom-roles-manager");
-const teamRolesManager = require("../../../roles/team-roles-manager");
-const twitchRolesManager = require("../../../../shared/twitch-roles");
-const logger = require("../../../logwrapper");
-const moment = require("moment");
-const triviaHelper = require("./trivia-helper");
-const NodeCache = require("node-cache");
-const twitchApi = require("../../../twitch-api/api");
+type TriviaQuestion = {
+    username: string;
+    question: {
+        answers: string[];
+        correctIndex: number;
+    };
+    wager: number;
+    winningsMultiplier: number;
+    currencyId: string;
+    chatter: "Streamer" | "Bot";
+    postCorrectAnswer: boolean;
+};
 
-let fiveSecTimeoutId;
-let answerTimeoutId;
-let currentQuestion = null;
+let fiveSecTimeoutId: NodeJS.Timeout | null = null;
+let answerTimeoutId: NodeJS.Timeout | null = null;
+let currentQuestion: TriviaQuestion | null = null;
 
 function clearCurrentQuestion() {
     currentQuestion = null;
@@ -32,9 +46,7 @@ function clearCurrentQuestion() {
     }
 }
 
-twitchListeners.events.on("chat-message", async (data) => {
-    /**@type {import("../../../../types/chat").FirebotChatMessage} */
-    const chatMessage = data;
+async function onChatMessage(chatMessage: FirebotChatMessage) {
     if (!currentQuestion) {
         return;
     }
@@ -48,13 +60,15 @@ twitchListeners.events.on("chat-message", async (data) => {
     if (args.length < 1) {
         return;
     }
-    //insure number
-    const firstArg = parseInt(args[0]);
-    if (isNaN(firstArg)) {
-        return;
+    let firstArg: number = undefined;
+    //insure number; allow for either of: `1` or `!trivia 1`
+    if (args.length === 1 && args[0] && !Number.isNaN(parseInt(args[0]))) {
+        firstArg = parseInt(args[0]);
+    } else if (args.length === 2 && args[0].startsWith("!trivia") && !Number.isNaN(parseInt(args[1]))) {
+        firstArg = parseInt(args[1]);
     }
-    // outside the answer bound
-    if (firstArg < 1 || firstArg > question.answers.length) {
+    // outside the answer bounds or parsing failed
+    if (!firstArg || firstArg < 1 || firstArg > question.answers.length) {
         return;
     }
 
@@ -67,18 +81,21 @@ twitchListeners.events.on("chat-message", async (data) => {
 
         const currency = currencyAccess.getCurrencyById(currencyId);
 
-        await twitchChat.sendChatMessage(`${chatMessage.userDisplayName ?? username}, that is correct! You have won ${util.commafy(winnings)} ${currency.name}`, null, chatter);
+        await twitchChat.sendChatMessage(`${chatMessage.userDisplayName ?? username}, that is correct! You have won ${
+            util.commafy(winnings)} ${currency.name}`, null, chatter);
     } else {
-        await twitchChat.sendChatMessage(`Sorry ${chatMessage.userDisplayName ?? username}, that is incorrect.${postCorrectAnswer ? ` The correct answer was ${question.answers[question.correctIndex - 1]}.` : ""} Better luck next time!`, null, chatter);
+        await twitchChat.sendChatMessage(`Sorry ${chatMessage.userDisplayName ?? username}, that is incorrect.${
+            postCorrectAnswer ? ` The correct answer was ${question.answers[question.correctIndex - 1]}.` : ""
+        } Better luck next time!`, null, chatter);
     }
     clearCurrentQuestion();
-});
+}
 
 const cooldownCache = new NodeCache({ checkperiod: 5 });
 
 const TRIVIA_COMMAND_ID = "firebot:trivia";
 
-const triviaCommand = {
+const triviaCommand: SystemCommand = {
     definition: {
         id: TRIVIA_COMMAND_ID,
         name: "Trivia",
@@ -103,15 +120,14 @@ const triviaCommand = {
 
         const { userCommand } = event;
 
-        const triviaSettings = gameManager.getGameSettings("firebot-trivia");
+        const triviaSettings = gameManager.getGameSettings("firebot-trivia") as GameSettings<TriviaSettings>;
         const chatter = triviaSettings.settings.chatSettings.chatter;
 
         const username = userCommand.commandSender;
-        const user = await twitchApi.users.getUserByName(username);
-        if (user == null) {
-            logger.warn(`Could not process trivia command for ${username}. User does not exist.`);
-            return;
-        }
+        const user = {
+            displayName: event.chatMessage.userDisplayName ?? username,
+            id: event.chatMessage.userId
+        };
 
         if (event.userCommand.subcommandId === "wagerAmount") {
             const triggeredArg = userCommand.args[0];
@@ -119,7 +135,10 @@ const triviaCommand = {
 
             if (currentQuestion) {
                 if (currentQuestion.username === username) {
-                    await twitchChat.sendChatMessage(`${user.displayName}, you already have a trivia question in progress!`, null, chatter);
+                    // If they are attempting to submit a response, but included the trigger: silently ignore here
+                    if (wagerAmount < 1 || wagerAmount >= currentQuestion.question.answers.length) {
+                        await twitchChat.sendChatMessage(`${user.displayName}, you already have a trivia question in progress!`, null, chatter);
+                    }
                     return;
                 }
                 await twitchChat.sendChatMessage(`${user.displayName}, someone else is currently answering a question. Please wait for them to finish.`, null, chatter);
@@ -139,7 +158,7 @@ const triviaCommand = {
             }
 
             const minWager = triviaSettings.settings.currencySettings.minWager;
-            if (minWager != null & minWager > 0) {
+            if (minWager != null && minWager > 0) {
                 if (wagerAmount < minWager) {
                     await twitchChat.sendChatMessage(`${user.displayName}, your wager amount must be at least ${minWager}.`, null, chatter);
                     return;
@@ -272,11 +291,15 @@ const triviaCommand = {
 function registerTriviaCommand() {
     if (!commandManager.hasSystemCommand(TRIVIA_COMMAND_ID)) {
         commandManager.registerSystemCommand(triviaCommand);
+        twitchListeners.events.addListener<FirebotChatMessage>("chat-message", onChatMessage);
     }
 }
 
 function unregisterTriviaCommand() {
-    commandManager.unregisterSystemCommand(TRIVIA_COMMAND_ID);
+    if (commandManager.hasSystemCommand(TRIVIA_COMMAND_ID)) {
+        commandManager.unregisterSystemCommand(TRIVIA_COMMAND_ID);
+        twitchListeners.events.removeListener<FirebotChatMessage>("chat-message", onChatMessage);
+    }
 }
 
 function purgeCaches() {
@@ -284,6 +307,8 @@ function purgeCaches() {
     clearCurrentQuestion();
 }
 
-exports.purgeCaches = purgeCaches;
-exports.registerTriviaCommand = registerTriviaCommand;
-exports.unregisterTriviaCommand = unregisterTriviaCommand;
+export default {
+    purgeCaches,
+    registerTriviaCommand,
+    unregisterTriviaCommand
+};

@@ -1,37 +1,51 @@
-"use strict";
+import util from "../../../utility";
+import twitchChat from "../../../chat/twitch-chat";
+import commandManager from "../../../chat/commands/command-manager";
+import gameManager from "../../game-manager";
+import currencyAccess from "../../../currency/currency-access";
+import currencyManager from "../../../currency/currency-manager";
+import { SystemCommand } from "../../../../types/commands";
+import { GameSettings } from "../../../../types/game-manager";
+import { BidSettings } from "./bid-settings";
+import moment from "moment";
+import NodeCache from "node-cache";
 
-const util = require("../../../utility");
-const twitchChat = require("../../../chat/twitch-chat");
-const commandManager = require("../../../chat/commands/command-manager");
-const gameManager = require("../../game-manager");
-const currencyAccess = require("../../../currency/currency-access").default;
-const currencyManager = require("../../../currency/currency-manager");
-const moment = require("moment");
-const NodeCache = require("node-cache");
-
-let activeBiddingInfo = {
-    "active": false,
-    "currentBid": 0,
-    "topBidder": "",
-    "topBidderDisplayName": ""
+type GameData = {
+    active: boolean;
+    currentBid: number;
+    topBidder: string;
+    topBidderDisplayName: string;
 };
-let bidTimer;
+
+let activeBiddingInfo: GameData = {
+    active: false,
+    currentBid: 0,
+    topBidder: "",
+    topBidderDisplayName: ""
+};
+let bidTimer: NodeJS.Timeout|null;
 const cooldownCache = new NodeCache({checkperiod: 5});
 const BID_COMMAND_ID = "firebot:bid";
 
 function purgeCaches() {
     cooldownCache.flushAll();
     activeBiddingInfo = {
-        "active": false,
-        "currentBid": 0,
-        "topBidder": ""
+        active: false,
+        currentBid: 0,
+        topBidder: "",
+        topBidderDisplayName: ""
     };
 }
 
-async function stopBidding(chatter) {
-    clearTimeout(bidTimer);
+async function stopBidding(chatter: string) {
+    if (bidTimer) {
+        clearTimeout(bidTimer);
+        bidTimer = null;
+    }
     if (activeBiddingInfo.topBidder) {
-        await twitchChat.sendChatMessage(`${activeBiddingInfo.topBidderDisplayName} has won the bidding with ${activeBiddingInfo.currentBid}!`, null, chatter);
+        await twitchChat.sendChatMessage(`${activeBiddingInfo.topBidderDisplayName} has won the bidding with ${util.commafy(activeBiddingInfo.currentBid)}!`, null, chatter);
+    } else if (!activeBiddingInfo.active) {
+        await twitchChat.sendChatMessage(`There is no bidding session active to stop.`, null, chatter);
     } else {
         await twitchChat.sendChatMessage(`There is no winner, because no one bid!`, null, chatter);
     }
@@ -39,7 +53,7 @@ async function stopBidding(chatter) {
     purgeCaches();
 }
 
-const bidCommand = {
+const bidCommand: SystemCommand = {
     definition: {
         id: BID_COMMAND_ID,
         name: "Bid",
@@ -103,7 +117,7 @@ const bidCommand = {
     onTriggerEvent: async (event) => {
         const { chatMessage, userCommand } = event;
 
-        const bidSettings = gameManager.getGameSettings("firebot-bid");
+        const bidSettings = gameManager.getGameSettings("firebot-bid") as GameSettings<BidSettings>;
         const chatter = bidSettings.settings.chatSettings.chatter;
 
         const currencyId = bidSettings.settings.currencySettings.currencyId;
@@ -114,30 +128,31 @@ const bidCommand = {
             const triggeredArg = userCommand.args[1];
             const bidAmount = parseInt(triggeredArg);
 
-            if (isNaN(bidAmount)) {
-                await twitchChat.sendChatMessage(`Invalid amount. Please enter a number to start bidding.`, null, chatter, chatMessage.id);
+            if (activeBiddingInfo.active !== false) {
+                await twitchChat.sendChatMessage(`There is already a bid running. Use ${userCommand.trigger} stop to stop it.`, null, chatter, chatMessage.id);
                 return;
             }
 
-            if (activeBiddingInfo.active !== false) {
-                await twitchChat.sendChatMessage(`There is already a bid running. Use !bid stop to stop it.`, null, chatter, chatMessage.id);
+            if (isNaN(bidAmount)) {
+                await twitchChat.sendChatMessage(`Invalid amount. Please enter a number to start the bidding at.`, null, chatter, chatMessage.id);
                 return;
             }
 
             if (bidAmount < bidSettings.settings.currencySettings.minBid) {
-                await twitchChat.sendChatMessage(`The opening bid must be more than ${bidSettings.settings.currencySettings.minBid}.`, null, chatter, chatMessage.id);
+                await twitchChat.sendChatMessage(`The opening bid must be more than ${util.commafy(bidSettings.settings.currencySettings.minBid)}.`, null, chatter, chatMessage.id);
                 return;
             }
 
             activeBiddingInfo = {
-                "active": true,
-                "currentBid": bidAmount,
-                "topBidder": ""
+                active: true,
+                currentBid: bidAmount,
+                topBidder: "",
+                topBidderDisplayName: ""
             };
 
             const raiseMinimum = bidSettings.settings.currencySettings.minIncrement;
             const minimumBidWithRaise = activeBiddingInfo.currentBid + raiseMinimum;
-            await twitchChat.sendChatMessage(`Bidding has started at ${bidAmount} ${currencyName}. Type !bid ${minimumBidWithRaise} to start bidding.`, null, chatter);
+            await twitchChat.sendChatMessage(`Bidding has started at ${util.commafy(bidAmount)} ${currencyName}. Type !bid ${minimumBidWithRaise} to place a bid.`, null, chatter);
 
             const timeLimit = bidSettings.settings.timeSettings.timeLimit * 60000;
             bidTimer = setTimeout(async () => {
@@ -176,11 +191,9 @@ const bidCommand = {
             }
 
             const minBid = bidSettings.settings.currencySettings.minBid;
-            if (minBid != null && minBid > 0) {
-                if (bidAmount < minBid) {
-                    await twitchChat.sendChatMessage(`Bid amount must be at least ${minBid} ${currencyName}.`, null, chatter, chatMessage.id);
-                    return;
-                }
+            if (minBid != null && minBid > 0 && bidAmount < minBid) {
+                await twitchChat.sendChatMessage(`Bid amount must be at least ${util.commafy(minBid)} ${currencyName}.`, null, chatter, chatMessage.id);
+                return;
             }
 
             const userBalance = await currencyManager.getViewerCurrencyAmount(username, currencyId);
@@ -192,7 +205,7 @@ const bidCommand = {
             const raiseMinimum = bidSettings.settings.currencySettings.minIncrement;
             const minimumBidWithRaise = activeBiddingInfo.currentBid + raiseMinimum;
             if (bidAmount < minimumBidWithRaise) {
-                await twitchChat.sendChatMessage(`You must bid at least ${minimumBidWithRaise} ${currencyName}.`, null, chatter, chatMessage.id);
+                await twitchChat.sendChatMessage(`You must bid at least ${util.commafy(minimumBidWithRaise)} ${currencyName}.`, null, chatter, chatMessage.id);
                 return;
             }
 
@@ -200,12 +213,12 @@ const bidCommand = {
             const previousHighBidAmount = activeBiddingInfo.currentBid;
             if (previousHighBidder != null && previousHighBidder !== "") {
                 await currencyManager.adjustCurrencyForViewer(previousHighBidder, currencyId, previousHighBidAmount);
-                await twitchChat.sendChatMessage(`You have been out bid! You've been refunded ${previousHighBidAmount} ${currencyName}.`, null, chatter, chatMessage.id);
+                await twitchChat.sendChatMessage(`You have been out bid! You've been refunded ${util.commafy(previousHighBidAmount)} ${currencyName}.`, null, chatter, chatMessage.id);
             }
 
             await currencyManager.adjustCurrencyForViewer(username, currencyId, -Math.abs(bidAmount));
             const newTopBidWithRaise = bidAmount + raiseMinimum;
-            await twitchChat.sendChatMessage(`${userDisplayName} is the new high bidder at ${bidAmount} ${currencyName}. To bid, type !bid ${newTopBidWithRaise} (or higher).`);
+            await twitchChat.sendChatMessage(`${userDisplayName} is the new high bidder at ${util.commafy(bidAmount)} ${currencyName}. To bid, type !bid ${newTopBidWithRaise} (or higher).`);
 
             // eslint-disable-next-line no-use-before-define
             setNewHighBidder(username, userDisplayName, bidAmount);
@@ -228,15 +241,19 @@ function registerBidCommand() {
 }
 
 function unregisterBidCommand() {
-    commandManager.unregisterSystemCommand(BID_COMMAND_ID);
+    if (commandManager.hasSystemCommand(BID_COMMAND_ID)) {
+        commandManager.unregisterSystemCommand(BID_COMMAND_ID);
+    }
 }
 
-function setNewHighBidder(username, userDisplayName, amount) {
+function setNewHighBidder(username: string, userDisplayName: string, amount: number) {
     activeBiddingInfo.currentBid = amount;
     activeBiddingInfo.topBidder = username;
     activeBiddingInfo.topBidderDisplayName = userDisplayName;
 }
 
-exports.purgeCaches = purgeCaches;
-exports.registerBidCommand = registerBidCommand;
-exports.unregisterBidCommand = unregisterBidCommand;
+export default {
+    purgeCaches,
+    registerBidCommand,
+    unregisterBidCommand
+};
