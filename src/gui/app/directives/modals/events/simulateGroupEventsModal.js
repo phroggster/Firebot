@@ -98,7 +98,9 @@
                     },
                     'subs-gifted': {
                         'gifterUsername': 'An Anonymous Gifter',
-                        'username': 'ananonymousgifter'
+                        'username': 'ananonymousgifter',
+                        'userDisplayName': 'An Anonymous Gifter',
+                        'userId': ''
                     }
                 };
 
