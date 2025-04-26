@@ -7,7 +7,8 @@
         bindings: {
             metadata: "=",
             name: "<?",
-            onUpdate: "&",
+            watchProps: "<?",
+            onUpdate: "&?",
             trigger: "@?",
             triggerMeta: "<?",
             modalId: "@?"
@@ -143,9 +144,13 @@
         controller: function($scope, $sce, backendCommunicator) {
             const ctrl = this;
 
-            $scope.$watchCollection("$ctrl.metadata", (changes) => {
-                if (changes.key === 'isAnonymous') {
-                    ctrl.onUpdate({ value: changes.value });
+            $scope.$watchCollection("$ctrl.metadata", (newData, oldData) => {
+                if (!ctrl.onUpdate || !newData?.key || newData.value === oldData?.value || !Array.isArray(ctrl.watchProps)) {
+                    return;
+                }
+
+                if (ctrl.watchProps.includes(newData.key)) {
+                    ctrl.onUpdate({ key: newData.key, value: newData.value });
                 }
             });
 

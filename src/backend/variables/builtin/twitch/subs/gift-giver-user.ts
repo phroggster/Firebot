@@ -9,7 +9,7 @@ triggers[EffectTrigger.MANUAL] = true;
 const model : ReplaceVariable = {
     definition: {
         handle: "giftGiverUsername",
-        description: "The name of the user who gifted a sub(s).",
+        description: "The display name of the user who gifted a sub(s).",
         triggers: triggers,
         categories: [VariableCategory.COMMON, VariableCategory.TRIGGER],
         possibleDataOutput: [OutputDataType.TEXT]

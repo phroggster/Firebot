@@ -149,8 +149,10 @@ module.exports = {
             description: "When someone gifts a sub to someone else in your channel.",
             cached: false,
             manualMetadata: {
-                gifterUsername: "Firebot",
                 isAnonymous: false,
+                username: "firebot",
+                userDisplayName: "Firebot",
+                userId: "",
                 subPlan: {
                     type: "enum",
                     options: {
@@ -164,11 +166,29 @@ module.exports = {
                 giftDuration: 1,
                 gifteeUsername: "MageEnclave"
             },
+            someSillyNameThatICantThinkOfToDescribeThis: {
+                username: {
+                    anonValue: null,
+                    anonWhen: "isAnonymous",
+                    description: '<small class="muted">The username of the gift sub purchaser.</small>'
+                },
+                userDisplayName: {
+                    anonValue: "An Anonymous Gifter",
+                    anonWhen: "isAnonymous",
+                    duplicates: ["gifterUsername"],
+                    description: '<small class="muted">The display name of the gift sub purchaser.</small>'
+                },
+                userId: {
+                    anonValue: null,
+                    anonWhen: "isAnonymous",
+                    description: '<small class="muted">The unique ID of the gift sub purchaser.</small>'
+                }
+            },
             activityFeed: {
                 icon: "fad fa-gift",
                 getMessage: (eventData) => {
                     return `**${eventData.isAnonymous ? "An Anonymous Gifter" : eventData.gifterUsername}** gifted a ${
-                        eventData.giftDuration > 1 ? ` **${eventData.giftDuration} month** ` : ""
+                        eventData.giftDuration > 1 ? `**${eventData.giftDuration} month**` : ""
                     } **Tier ${eventData.subPlan.replace("000", "")}** sub to **${
                         eventData.gifteeUsername
                     }** (Subbed for ${eventData.giftSubMonths} month${eventData.giftSubMonths > 1 ? "s" : ""} total)`;
@@ -181,8 +201,10 @@ module.exports = {
             description: "When someone gifts random subs to the community of the channel",
             cached: false,
             manualMetadata: {
-                gifterUsername: "Firebot",
                 isAnonymous: false,
+                username: "firebot",
+                userDisplayName: "Firebot",
+                userId: "",
                 subCount: 5,
                 subPlan: {
                     type: "enum",
@@ -202,6 +224,24 @@ module.exports = {
                         { gifteeUsername: "User4", giftSubMonths: 10 },
                         { gifteeUsername: "User5", giftSubMonths: 16 }
                     ]
+                }
+            },
+            someSillyNameThatICantThinkOfToDescribeThis: {
+                username: {
+                    anonValue: null,
+                    anonWhen: "isAnonymous",
+                    description: '<small class="muted">The username of the community sub(s) purchaser.</small>'
+                },
+                userDisplayName: {
+                    anonValue: "An Anonymous Gifter",
+                    anonWhen: "isAnonymous",
+                    duplicates: ["gifterUsername"],
+                    description: '<small class="muted">The display name of the community gift sub(s) purchaser.</small>'
+                },
+                userId: {
+                    anonValue: null,
+                    anonWhen: "isAnonymous",
+                    description: '<small class="muted">The unique ID of the community gift sub(s) purchaser.</small>'
                 }
             },
             activityFeed: {
@@ -255,7 +295,6 @@ module.exports = {
                 username: "firebot",
                 userDisplayName: "Firebot",
                 userId: "",
-                isAnonymous: false,
                 bits: 100,
                 totalBits: 1200,
                 cheerMessage: "cheer100 Test message"
